@@ -202,21 +202,25 @@ function Match({ g, match }) {
   const t = toVN(match.fixture.date);
   const hId = match.teams.home.id, aId = match.teams.away.id;
 
-  // Lấy phong độ: 5 trận gần nhất của 1 đội -> chuỗi W/D/L + ghi/thủng lưới
+  // Phong độ: trả về cả thống kê tổng VÀ chi tiết từng trận (đối thủ, tỉ số, kết quả)
   function summarizeForm(fixtures, teamId) {
     let w = 0, d = 0, l = 0, gf = 0, ga = 0;
-    const seq = [];
+    const seq = [], recent = [];
     for (const fx of fixtures) {
       const isHome = fx.teams.home.id === teamId;
       const my = isHome ? fx.goals.home : fx.goals.away;
       const op = isHome ? fx.goals.away : fx.goals.home;
+      const opp = isHome ? fx.teams.away : fx.teams.home;
       if (my == null || op == null) continue;
       gf += my; ga += op;
-      if (my > op) { w++; seq.push("T"); }
-      else if (my < op) { l++; seq.push("B"); }
-      else { d++; seq.push("H"); }
+      let r;
+      if (my > op) { w++; r = "T"; }
+      else if (my < op) { l++; r = "B"; }
+      else { d++; r = "H"; }
+      seq.push(r);
+      recent.push({ opp: opp?.name || "—", oppLogo: opp?.logo, my, op, r, date: fx.fixture.date });
     }
-    return { w, d, l, gf, ga, seq };
+    return { w, d, l, gf, ga, seq, recent };
   }
 
   const load = useCallback(async () => {
@@ -226,11 +230,10 @@ function Match({ g, match }) {
         const r = await fetch(API("fixtures/statistics", { fixture: match.fixture.id }));
         const j = await r.json(); setStats(j.response || []);
       } else {
-        // Song song: h2h + phong độ 2 đội
         const [rh2h, rH, rA] = await Promise.all([
           fetch(API("fixtures/headtohead", { h2h: `${hId}-${aId}`, last: 10 })).then(x => x.json()),
-          fetch(API("fixtures", { team: hId, last: 5 })).then(x => x.json()),
-          fetch(API("fixtures", { team: aId, last: 5 })).then(x => x.json()),
+          fetch(API("fixtures", { team: hId, last: 6 })).then(x => x.json()),
+          fetch(API("fixtures", { team: aId, last: 6 })).then(x => x.json()),
         ]);
         setH2h(rh2h.response || []);
         setFormHome(summarizeForm(rH.response || [], hId));
@@ -246,7 +249,6 @@ function Match({ g, match }) {
     return item ? (item.value ?? "—") : "—";
   };
 
-  // Tính tổng h2h + nhận định/dự đoán
   function h2hSummary() {
     if (!h2h) return null;
     let hw = 0, aw = 0, dr = 0;
@@ -262,33 +264,52 @@ function Match({ g, match }) {
     return { hw, aw, dr, total: hw + aw + dr };
   }
 
+  // điểm phong độ (thắng 3, hòa 1)
+  const pts = (fm) => fm ? fm.w * 3 + fm.d : 0;
+
   function verdict() {
-    const hs = h2hSummary();
-    const fh = formHome, fa = formAway;
-    if (!hs && !fh) return null;
-    // điểm phong độ: thắng 3, hòa 1
-    const ph = fh ? fh.w * 3 + fh.d : 0;
-    const pa = fa ? fa.w * 3 + fa.d : 0;
+    const fh = formHome, fa = formAway, hs = h2hSummary();
+    if (!fh && !fa) return null;
+    const ph = pts(fh), pa = pts(fa);
     const diff = ph - pa;
     let pick, scoreline;
-    if (Math.abs(diff) <= 1) { pick = "Hòa hoặc sít sao"; scoreline = "1-1"; }
-    else if (diff > 0) { pick = match.teams.home.name + " nhỉnh hơn"; scoreline = "2-1"; }
-    else { pick = match.teams.away.name + " nhỉnh hơn"; scoreline = "1-2"; }
-    // % thô từ điểm phong độ + h2h
+    if (Math.abs(diff) <= 1) { pick = "Cân bằng, khó phân thắng bại"; scoreline = "1-1"; }
+    else if (diff > 0) { pick = match.teams.home.name + " được đánh giá cao hơn"; scoreline = "2-1"; }
+    else { pick = match.teams.away.name + " được đánh giá cao hơn"; scoreline = "1-2"; }
     let hWin = 40 + diff * 4, aWin = 40 - diff * 4;
     if (hs && hs.total) { hWin += (hs.hw - hs.aw) * 3; aWin += (hs.aw - hs.hw) * 3; }
     hWin = Math.max(10, Math.min(80, hWin)); aWin = Math.max(10, Math.min(80, aWin));
     const drawP = Math.max(10, 100 - hWin - aWin);
     const sum = hWin + aWin + drawP;
-    return {
-      pick, scoreline,
-      pHome: Math.round(hWin / sum * 100),
-      pDraw: Math.round(drawP / sum * 100),
-      pAway: Math.round(aWin / sum * 100),
-    };
+    return { pick, scoreline, diff, pHome: Math.round(hWin/sum*100), pDraw: Math.round(drawP/sum*100), pAway: Math.round(aWin/sum*100) };
+  }
+
+  // Nhận định chữ dài, có lý lẽ
+  function analysisText() {
+    const fh = formHome, fa = formAway;
+    if (!fh && !fa) return null;
+    const H = match.teams.home.name, A = match.teams.away.name;
+    const parts = [];
+    if (fh) {
+      const tone = fh.w >= 3 ? "đang có phong độ rất tốt" : fh.w >= 2 ? "có phong độ khá ổn định" : fh.l >= 3 ? "đang sa sút" : "phong độ thất thường";
+      parts.push(`${H} ${tone} với ${fh.w} thắng, ${fh.d} hòa, ${fh.l} thua trong các trận gần đây, ghi ${fh.gf} bàn và để thủng lưới ${fh.ga} bàn.`);
+    }
+    if (fa) {
+      const tone = fa.w >= 3 ? "đang chơi bùng nổ" : fa.w >= 2 ? "thi đấu tương đối tốt" : fa.l >= 3 ? "gặp nhiều khó khăn" : "có phong độ chưa ổn định";
+      parts.push(`${A} ${tone} với ${fa.w} thắng, ${fa.d} hòa, ${fa.l} thua, hiệu số ghi/thủng lưới ${fa.gf}/${fa.ga}.`);
+    }
+    if (fh && fa) {
+      const atkH = fh.gf, atkA = fa.gf, defH = fh.ga, defA = fa.ga;
+      if (atkH > atkA) parts.push(`Về hàng công, ${H} ghi bàn hiệu quả hơn.`);
+      else if (atkA > atkH) parts.push(`Về hàng công, ${A} sắc bén hơn.`);
+      if (defH < defA) parts.push(`Hàng thủ ${H} chắc chắn hơn.`);
+      else if (defA < defH) parts.push(`Hàng thủ ${A} an toàn hơn.`);
+    }
+    return parts.join(" ");
   }
 
   const seqColor = (c) => c === "T" ? C.green : c === "B" ? "#FF6B7A" : C.gold;
+  const v = !done ? verdict() : null;
 
   return (
     <div>
@@ -322,7 +343,17 @@ function Match({ g, match }) {
 
       {!done && !loading && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Phong độ thật */}
+          {/* So sánh trực quan */}
+          {formHome && formAway && v && (
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>📊 So sánh hai đội</div>
+              <CompareBar label="Điểm phong độ (5 trận)" h={pts(formHome)} a={pts(formAway)} hName={match.teams.home.name} aName={match.teams.away.name} />
+              <CompareBar label="Bàn thắng ghi được" h={formHome.gf} a={formAway.gf} hName={match.teams.home.name} aName={match.teams.away.name} />
+              <CompareBar label="Bàn thua (ít hơn = tốt)" h={formHome.ga} a={formAway.ga} hName={match.teams.home.name} aName={match.teams.away.name} invert />
+            </div>
+          )}
+
+          {/* Phong độ + 5 trận gần nhất chi tiết */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {[[match.teams.home, formHome], [match.teams.away, formAway]].map(([team, fm], i) => (
               <div key={i} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
@@ -336,8 +367,21 @@ function Match({ g, match }) {
                         <span key={k} style={{ width: 22, height: 22, borderRadius: 6, background: seqColor(c), color: "#0B1120", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{c}</span>
                       )) : <span style={{ color: C.sub, fontSize: 13 }}>Chưa có dữ liệu</span>}
                     </div>
-                    <div style={{ fontSize: 13, color: "#9FB0C9" }}>5 trận gần nhất: <b style={{ color: C.green }}>{fm.w}T</b> <b style={{ color: C.gold }}>{fm.d}H</b> <b style={{ color: "#FF6B7A" }}>{fm.l}B</b></div>
-                    <div style={{ fontSize: 13, color: "#9FB0C9", marginTop: 4 }}>Ghi/thủng lưới: {fm.gf} / {fm.ga}</div>
+                    <div style={{ fontSize: 13, color: "#9FB0C9", marginBottom: 8 }}>
+                      <b style={{ color: C.green }}>{fm.w}T</b> <b style={{ color: C.gold }}>{fm.d}H</b> <b style={{ color: "#FF6B7A" }}>{fm.l}B</b> · Ghi/thủng: {fm.gf}/{fm.ga}
+                    </div>
+                    {fm.recent.length > 0 && (
+                      <div style={{ borderTop: `1px solid #1A2336`, paddingTop: 8 }}>
+                        <div style={{ fontSize: 11, color: C.dim, marginBottom: 5 }}>Các trận gần nhất:</div>
+                        {fm.recent.map((m2, k) => (
+                          <div key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "3px 0" }}>
+                            <span style={{ width: 16, height: 16, borderRadius: 4, background: seqColor(m2.r), color: "#0B1120", fontWeight: 800, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{m2.r}</span>
+                            <span style={{ color: C.sub, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>vs {m2.opp}</span>
+                            <span style={{ fontWeight: 700 }}>{m2.my}-{m2.op}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </>
                 ) : <span style={{ color: C.sub, fontSize: 13 }}>Đang tải…</span>}
               </div>
@@ -368,24 +412,47 @@ function Match({ g, match }) {
                   );
                 })}
               </>
-            ) : <span style={{ color: C.sub, fontSize: 13 }}>Hai đội chưa từng gặp nhau (hoặc đang tải).</span>}
+            ) : <span style={{ color: C.sub, fontSize: 13 }}>Chưa có dữ liệu đối đầu gần đây giữa hai đội trong hệ thống. Tham khảo phong độ và so sánh ở trên để đánh giá.</span>}
           </div>
 
-          {/* Nhận định + dự đoán */}
-          {(() => { const v = verdict(); return v ? (
+          {/* Nhận định chữ dài + dự đoán */}
+          {v && (
             <div style={{ background: "linear-gradient(135deg,#1A2440,#13192B)", border: `1px solid ${C.line2}`, borderRadius: 14, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10, color: C.gold }}>✨ Nhận định & dự đoán</div>
-              <div style={{ fontSize: 14, marginBottom: 12 }}>Dựa trên phong độ gần đây và lịch sử đối đầu: <b>{v.pick}</b>. Dự đoán tỉ số: <b style={{ color: C.gold }}>{v.scoreline}</b>.</div>
+              {analysisText() && <div style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 12, color: "#D5DEEC" }}>{analysisText()}</div>}
+              <div style={{ fontSize: 14, marginBottom: 12 }}>Đánh giá chung: <b>{v.pick}</b>. Dự đoán tỉ số: <b style={{ color: C.gold }}>{v.scoreline}</b>.</div>
               <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center" }}>
                 <Pred label={match.teams.home.name} value={v.pHome + "%"} />
                 <Pred label="Hòa" value={v.pDraw + "%"} />
                 <Pred label={match.teams.away.name} value={v.pAway + "%"} />
               </div>
-              <div style={{ fontSize: 11, color: C.dim, marginTop: 12, textAlign: "center" }}>Dự đoán mang tính tham khảo, tính từ dữ liệu thật của API-Football.</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 12, textAlign: "center" }}>Nhận định tự động dựa trên dữ liệu phong độ thật từ API-Football, mang tính tham khảo.</div>
             </div>
-          ) : null; })()}
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function CompareBar({ label, h, a, hName, aName, invert }) {
+  const total = h + a;
+  let hPct = total > 0 ? (h / total) * 100 : 50;
+  let aPct = 100 - hPct;
+  // đội "tốt hơn" tô đậm; nếu invert (bàn thua) thì ít hơn là tốt
+  const hBetter = invert ? h < a : h > a;
+  const aBetter = invert ? a < h : a > h;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+        <b style={{ color: hBetter ? C.green : C.sub }}>{h}</b>
+        <span style={{ color: C.dim }}>{label}</span>
+        <b style={{ color: aBetter ? C.green : C.sub }}>{a}</b>
+      </div>
+      <div style={{ display: "flex", height: 8, borderRadius: 6, overflow: "hidden", background: "#0B1120" }}>
+        <div style={{ width: hPct + "%", background: hBetter ? C.green : C.line2 }} />
+        <div style={{ width: aPct + "%", background: aBetter ? C.accent : C.line2 }} />
+      </div>
     </div>
   );
 }
