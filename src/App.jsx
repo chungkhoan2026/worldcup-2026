@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 
-
 /* WORLD CUP 2026 — Lịch & phân tích (giờ Việt Nam) — Người viết app: Phạm Anh Khoa
    Nguồn: API-Football (league=1, season=2026) qua hàm trung gian /api/football */
 
@@ -351,6 +350,25 @@ function Match({ g, match }) {
               <CompareBar label="Điểm phong độ (5 trận)" h={pts(formHome)} a={pts(formAway)} hName={match.teams.home.name} aName={match.teams.away.name} />
               <CompareBar label="Bàn thắng ghi được" h={formHome.gf} a={formAway.gf} hName={match.teams.home.name} aName={match.teams.away.name} />
               <CompareBar label="Bàn thua (ít hơn = tốt)" h={formHome.ga} a={formAway.ga} hName={match.teams.home.name} aName={match.teams.away.name} invert />
+              {(() => {
+                const H = match.teams.home.name, A = match.teams.away.name;
+                const lines = [];
+                const pf = pts(formHome), pa = pts(formAway);
+                if (pf > pa) lines.push(`Về phong độ, ${H} đang chơi tốt hơn (${pf} so với ${pa} điểm).`);
+                else if (pa > pf) lines.push(`Về phong độ, ${A} đang chơi tốt hơn (${pa} so với ${pf} điểm).`);
+                else lines.push(`Về phong độ, hai đội ngang nhau (${pf} điểm).`);
+                if (formHome.gf > formAway.gf) lines.push(`Về hàng công, ${H} ghi bàn nhiều hơn (${formHome.gf} so với ${formAway.gf} bàn).`);
+                else if (formAway.gf > formHome.gf) lines.push(`Về hàng công, ${A} ghi bàn nhiều hơn (${formAway.gf} so với ${formHome.gf} bàn).`);
+                else lines.push(`Về hàng công, hai đội ghi bàn ngang nhau (${formHome.gf} bàn).`);
+                if (formHome.ga < formAway.ga) lines.push(`Về hàng thủ, ${H} chắc chắn hơn (chỉ thủng ${formHome.ga} so với ${formAway.ga} bàn).`);
+                else if (formAway.ga < formHome.ga) lines.push(`Về hàng thủ, ${A} chắc chắn hơn (chỉ thủng ${formAway.ga} so với ${formHome.ga} bàn).`);
+                else lines.push(`Về hàng thủ, hai đội thủng lưới ngang nhau (${formHome.ga} bàn).`);
+                return (
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid #1A2336`, fontSize: 14, lineHeight: 1.8, color: "#D5DEEC" }}>
+                    {lines.map((t2, k) => <div key={k}>• {t2}</div>)}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
