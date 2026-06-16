@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback } from "react";
    Người viết app: Phạm Anh Khoa
    ===================================================================== */
 
-const WC_LEAGUE_ID = 15;   // FIFA World Cup trên API-Football
+const WC_LEAGUE_ID = 1;   // FIFA World Cup trên API-Football
 const SEASON = 2026;
 const API = (path, params = {}) => {
   const qs = new URLSearchParams({ path, ...params }).toString();
