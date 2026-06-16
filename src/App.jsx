@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 
+
 /* WORLD CUP 2026 — Lịch & phân tích (giờ Việt Nam) — Người viết app: Phạm Anh Khoa
    Nguồn: API-Football (league=1, season=2026) qua hàm trung gian /api/football */
 
