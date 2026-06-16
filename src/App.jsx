@@ -93,7 +93,7 @@ export default function App() {
         <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}>↻</button>
       </header>
 
-      <main style={{ maxWidth: 760, margin: "0 auto", padding: 16 }}>
+      <main style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 28px" }}>
         {loading && <Center>Đang tải lịch thi đấu trực tuyến…</Center>}
         {error && !loading && (
           <div style={{ background: "rgba(230,57,70,.1)", border: `1px solid ${C.accent}`, borderRadius: 12, padding: 16, color: "#FF6B7A" }}>
@@ -138,19 +138,19 @@ function isDone(m) { return ["FT", "AET", "PEN"].includes(m.fixture?.status?.sho
 function Groups({ groups, onOpen }) {
   const ids = Object.keys(groups).sort();
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 18 }}>
       {ids.map((id) => {
         const teams = teamsOf(groups[id]);
         const done = groups[id].filter(isDone).length;
         return (
-          <button key={id} onClick={() => onOpen(id)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, color: "inherit" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <span style={{ fontWeight: 800, fontSize: 15, color: C.accent }}>Bảng {id}</span>
+          <button key={id} onClick={() => onOpen(id)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+              <span style={{ fontWeight: 800, fontSize: 18, color: C.accent }}>Bảng {id}</span>
               <span className="pill" style={{ background: C.line, color: "#9FB0C9" }}>{done}/{groups[id].length} đã đá</span>
             </div>
             {teams.map((t) => (
-              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 14 }}>
-                <img src={t.logo} alt="" width={18} height={18} style={{ objectFit: "contain" }} /><span>{t.name}</span>
+              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", fontSize: 16 }}>
+                <img src={t.logo} alt="" width={24} height={24} style={{ objectFit: "contain" }} /><span>{t.name}</span>
               </div>
             ))}
           </button>
@@ -164,7 +164,7 @@ function Group({ g, fixtures, onOpenMatch }) {
   const sorted = [...fixtures].sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
   return (
     <div>
-      <h2 style={{ fontSize: 22, fontWeight: 800, margin: "4px 0 16px" }}><span style={{ color: C.accent }}>Bảng {g}</span></h2>
+      <h2 style={{ fontSize: 28, fontWeight: 800, margin: "4px 0 20px" }}><span style={{ color: C.accent }}>Bảng {g}</span></h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {sorted.map((m) => {
           const t = toVN(m.fixture.date); const done = isDone(m);
