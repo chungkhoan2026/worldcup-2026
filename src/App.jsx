@@ -89,6 +89,7 @@ export default function App() {
           <div style={{ fontWeight: 800, fontSize: 17 }}>WORLD CUP 2026</div>
           <div style={{ fontSize: 11, color: C.sub }}>Lịch & phân tích · giờ Việt Nam (UTC+7)</div>
           <div style={{ fontSize: 10, color: C.dim }}>Người viết app: Phạm Anh Khoa</div>
+          <div style={{ fontSize: 10, color: C.dim }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa</div>
         </div>
         <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}>↻</button>
       </header>
@@ -116,6 +117,7 @@ export default function App() {
       <footer style={{ textAlign: "center", padding: "24px 16px", color: C.dim, fontSize: 11, borderTop: `1px solid ${C.line}`, marginTop: 24 }}>
         Dữ liệu: API-Football · cập nhật trực tuyến mỗi khi mở.
         <div style={{ marginTop: 8, color: C.sub, fontWeight: 700 }}>Người viết app: Phạm Anh Khoa</div>
+        <div style={{ marginTop: 2, color: C.dim }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa</div>
       </footer>
     </div>
   );
@@ -191,11 +193,31 @@ function Group({ g, fixtures, onOpenMatch }) {
 
 function Match({ g, match }) {
   const [stats, setStats] = useState(null);
-  const [pred, setPred] = useState(null);
+  const [h2h, setH2h] = useState(null);
+  const [formHome, setFormHome] = useState(null);
+  const [formAway, setFormAway] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const done = isDone(match);
   const t = toVN(match.fixture.date);
+  const hId = match.teams.home.id, aId = match.teams.away.id;
+
+  // Lấy phong độ: 5 trận gần nhất của 1 đội -> chuỗi W/D/L + ghi/thủng lưới
+  function summarizeForm(fixtures, teamId) {
+    let w = 0, d = 0, l = 0, gf = 0, ga = 0;
+    const seq = [];
+    for (const fx of fixtures) {
+      const isHome = fx.teams.home.id === teamId;
+      const my = isHome ? fx.goals.home : fx.goals.away;
+      const op = isHome ? fx.goals.away : fx.goals.home;
+      if (my == null || op == null) continue;
+      gf += my; ga += op;
+      if (my > op) { w++; seq.push("T"); }
+      else if (my < op) { l++; seq.push("B"); }
+      else { d++; seq.push("H"); }
+    }
+    return { w, d, l, gf, ga, seq };
+  }
 
   const load = useCallback(async () => {
     setLoading(true); setErr("");
@@ -204,11 +226,18 @@ function Match({ g, match }) {
         const r = await fetch(API("fixtures/statistics", { fixture: match.fixture.id }));
         const j = await r.json(); setStats(j.response || []);
       } else {
-        const r = await fetch(API("predictions", { fixture: match.fixture.id }));
-        const j = await r.json(); setPred(j.response?.[0] || null);
+        // Song song: h2h + phong độ 2 đội
+        const [rh2h, rH, rA] = await Promise.all([
+          fetch(API("fixtures/headtohead", { h2h: `${hId}-${aId}`, last: 10 })).then(x => x.json()),
+          fetch(API("fixtures", { team: hId, last: 5 })).then(x => x.json()),
+          fetch(API("fixtures", { team: aId, last: 5 })).then(x => x.json()),
+        ]);
+        setH2h(rh2h.response || []);
+        setFormHome(summarizeForm(rH.response || [], hId));
+        setFormAway(summarizeForm(rA.response || [], aId));
       }
     } catch (e) { setErr("Không tải được chi tiết. " + e.message); } finally { setLoading(false); }
-  }, [done, match.fixture.id]);
+  }, [done, match.fixture.id, hId, aId]);
   useEffect(() => { load(); }, [load]);
 
   const stat = (teamId, type) => {
@@ -216,6 +245,50 @@ function Match({ g, match }) {
     const item = block?.statistics?.find((x) => x.type === type);
     return item ? (item.value ?? "—") : "—";
   };
+
+  // Tính tổng h2h + nhận định/dự đoán
+  function h2hSummary() {
+    if (!h2h) return null;
+    let hw = 0, aw = 0, dr = 0;
+    for (const fx of h2h) {
+      if (fx.goals.home == null) continue;
+      const homeWin = fx.goals.home > fx.goals.away;
+      const draw = fx.goals.home === fx.goals.away;
+      const winnerIsHomeTeam = fx.teams.home.id === hId ? homeWin : !homeWin && !draw;
+      if (draw) dr++;
+      else if (winnerIsHomeTeam) hw++;
+      else aw++;
+    }
+    return { hw, aw, dr, total: hw + aw + dr };
+  }
+
+  function verdict() {
+    const hs = h2hSummary();
+    const fh = formHome, fa = formAway;
+    if (!hs && !fh) return null;
+    // điểm phong độ: thắng 3, hòa 1
+    const ph = fh ? fh.w * 3 + fh.d : 0;
+    const pa = fa ? fa.w * 3 + fa.d : 0;
+    const diff = ph - pa;
+    let pick, scoreline;
+    if (Math.abs(diff) <= 1) { pick = "Hòa hoặc sít sao"; scoreline = "1-1"; }
+    else if (diff > 0) { pick = match.teams.home.name + " nhỉnh hơn"; scoreline = "2-1"; }
+    else { pick = match.teams.away.name + " nhỉnh hơn"; scoreline = "1-2"; }
+    // % thô từ điểm phong độ + h2h
+    let hWin = 40 + diff * 4, aWin = 40 - diff * 4;
+    if (hs && hs.total) { hWin += (hs.hw - hs.aw) * 3; aWin += (hs.aw - hs.hw) * 3; }
+    hWin = Math.max(10, Math.min(80, hWin)); aWin = Math.max(10, Math.min(80, aWin));
+    const drawP = Math.max(10, 100 - hWin - aWin);
+    const sum = hWin + aWin + drawP;
+    return {
+      pick, scoreline,
+      pHome: Math.round(hWin / sum * 100),
+      pDraw: Math.round(drawP / sum * 100),
+      pAway: Math.round(aWin / sum * 100),
+    };
+  }
+
+  const seqColor = (c) => c === "T" ? C.green : c === "B" ? "#FF6B7A" : C.gold;
 
   return (
     <div>
@@ -247,25 +320,72 @@ function Match({ g, match }) {
         </div>
       )}
 
-      {!done && !loading && pred && (
+      {!done && !loading && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ background: "linear-gradient(135deg,#1A2440,#13192B)", border: `1px solid ${C.line2}`, borderRadius: 14, padding: 16 }}>
-            <div style={{ fontWeight: 800, marginBottom: 10, color: C.gold }}>✨ Dự đoán</div>
-            <div style={{ fontSize: 14, marginBottom: 8 }}>{pred.predictions?.advice || "—"}</div>
-            <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginTop: 8 }}>
-              <Pred label={match.teams.home.name} value={pred.predictions?.percent?.home} />
-              <Pred label="Hòa" value={pred.predictions?.percent?.draw} />
-              <Pred label={match.teams.away.name} value={pred.predictions?.percent?.away} />
-            </div>
+          {/* Phong độ thật */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {[[match.teams.home, formHome], [match.teams.away, formAway]].map(([team, fm], i) => (
+              <div key={i} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, marginBottom: 8 }}>
+                  <img src={team.logo} width={22} height={22} alt="" /> {team.name}
+                </div>
+                {fm ? (
+                  <>
+                    <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+                      {fm.seq.length ? fm.seq.map((c, k) => (
+                        <span key={k} style={{ width: 22, height: 22, borderRadius: 6, background: seqColor(c), color: "#0B1120", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{c}</span>
+                      )) : <span style={{ color: C.sub, fontSize: 13 }}>Chưa có dữ liệu</span>}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#9FB0C9" }}>5 trận gần nhất: <b style={{ color: C.green }}>{fm.w}T</b> <b style={{ color: C.gold }}>{fm.d}H</b> <b style={{ color: "#FF6B7A" }}>{fm.l}B</b></div>
+                    <div style={{ fontSize: 13, color: "#9FB0C9", marginTop: 4 }}>Ghi/thủng lưới: {fm.gf} / {fm.ga}</div>
+                  </>
+                ) : <span style={{ color: C.sub, fontSize: 13 }}>Đang tải…</span>}
+              </div>
+            ))}
           </div>
-          {pred.teams && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <FormBox t={pred.teams.home} /><FormBox t={pred.teams.away} />
+
+          {/* Lịch sử đối đầu */}
+          <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
+            <div style={{ fontWeight: 800, marginBottom: 10 }}>⚔️ Lịch sử đối đầu</div>
+            {h2h && h2h.length > 0 ? (
+              <>
+                {(() => { const hs = h2hSummary(); return hs ? (
+                  <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginBottom: 12, fontSize: 13 }}>
+                    <div><div style={{ fontWeight: 800, fontSize: 18, color: C.green }}>{hs.hw}</div><div style={{ color: C.sub }}>{match.teams.home.name} thắng</div></div>
+                    <div><div style={{ fontWeight: 800, fontSize: 18, color: C.gold }}>{hs.dr}</div><div style={{ color: C.sub }}>Hòa</div></div>
+                    <div><div style={{ fontWeight: 800, fontSize: 18, color: "#FF6B7A" }}>{hs.aw}</div><div style={{ color: C.sub }}>{match.teams.away.name} thắng</div></div>
+                  </div>
+                ) : null; })()}
+                {h2h.slice(0, 5).map((fx) => {
+                  const dd = toVN(fx.fixture.date);
+                  return (
+                    <div key={fx.fixture.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid #1A2336`, fontSize: 13 }}>
+                      <span style={{ color: C.sub, minWidth: 90 }}>{dd.date}/{new Date(fx.fixture.date).getUTCFullYear()}</span>
+                      <span style={{ flex: 1, textAlign: "right" }}>{fx.teams.home.name}</span>
+                      <span style={{ fontWeight: 800, color: C.gold, minWidth: 50, textAlign: "center" }}>{fx.goals.home}-{fx.goals.away}</span>
+                      <span style={{ flex: 1, textAlign: "left" }}>{fx.teams.away.name}</span>
+                    </div>
+                  );
+                })}
+              </>
+            ) : <span style={{ color: C.sub, fontSize: 13 }}>Hai đội chưa từng gặp nhau (hoặc đang tải).</span>}
+          </div>
+
+          {/* Nhận định + dự đoán */}
+          {(() => { const v = verdict(); return v ? (
+            <div style={{ background: "linear-gradient(135deg,#1A2440,#13192B)", border: `1px solid ${C.line2}`, borderRadius: 14, padding: 16 }}>
+              <div style={{ fontWeight: 800, marginBottom: 10, color: C.gold }}>✨ Nhận định & dự đoán</div>
+              <div style={{ fontSize: 14, marginBottom: 12 }}>Dựa trên phong độ gần đây và lịch sử đối đầu: <b>{v.pick}</b>. Dự đoán tỉ số: <b style={{ color: C.gold }}>{v.scoreline}</b>.</div>
+              <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center" }}>
+                <Pred label={match.teams.home.name} value={v.pHome + "%"} />
+                <Pred label="Hòa" value={v.pDraw + "%"} />
+                <Pred label={match.teams.away.name} value={v.pAway + "%"} />
+              </div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 12, textAlign: "center" }}>Dự đoán mang tính tham khảo, tính từ dữ liệu thật của API-Football.</div>
             </div>
-          )}
+          ) : null; })()}
         </div>
       )}
-      {!done && !loading && !pred && !err && <div style={{ color: C.sub, fontSize: 13, textAlign: "center", padding: 20 }}>Chưa có dữ liệu dự đoán cho trận này.</div>}
     </div>
   );
 }
