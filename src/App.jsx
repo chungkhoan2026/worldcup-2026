@@ -232,8 +232,8 @@ function Match({ g, match }) {
       } else {
         const [rh2h, rH, rA] = await Promise.all([
           fetch(API("fixtures/headtohead", { h2h: `${hId}-${aId}`, last: 10 })).then(x => x.json()),
-          fetch(API("fixtures", { team: hId, last: 6 })).then(x => x.json()),
-          fetch(API("fixtures", { team: aId, last: 6 })).then(x => x.json()),
+          fetch(API("fixtures", { team: hId, last: 10 })).then(x => x.json()),
+          fetch(API("fixtures", { team: aId, last: 10 })).then(x => x.json()),
         ]);
         setH2h(rh2h.response || []);
         setFormHome(summarizeForm(rH.response || [], hId));
@@ -291,11 +291,11 @@ function Match({ g, match }) {
     const H = match.teams.home.name, A = match.teams.away.name;
     const parts = [];
     if (fh) {
-      const tone = fh.w >= 3 ? "đang có phong độ rất tốt" : fh.w >= 2 ? "có phong độ khá ổn định" : fh.l >= 3 ? "đang sa sút" : "phong độ thất thường";
-      parts.push(`${H} ${tone} với ${fh.w} thắng, ${fh.d} hòa, ${fh.l} thua trong các trận gần đây, ghi ${fh.gf} bàn và để thủng lưới ${fh.ga} bàn.`);
+      const tone = fh.w >= 6 ? "đang có phong độ rất tốt" : fh.w >= 4 ? "có phong độ khá ổn định" : fh.l >= 5 ? "đang sa sút" : "phong độ thất thường";
+      parts.push(`${H} ${tone} với ${fh.w} thắng, ${fh.d} hòa, ${fh.l} thua trong 10 trận gần đây, ghi ${fh.gf} bàn và để thủng lưới ${fh.ga} bàn.`);
     }
     if (fa) {
-      const tone = fa.w >= 3 ? "đang chơi bùng nổ" : fa.w >= 2 ? "thi đấu tương đối tốt" : fa.l >= 3 ? "gặp nhiều khó khăn" : "có phong độ chưa ổn định";
+      const tone = fa.w >= 6 ? "đang chơi bùng nổ" : fa.w >= 4 ? "thi đấu tương đối tốt" : fa.l >= 5 ? "gặp nhiều khó khăn" : "có phong độ chưa ổn định";
       parts.push(`${A} ${tone} với ${fa.w} thắng, ${fa.d} hòa, ${fa.l} thua, hiệu số ghi/thủng lưới ${fa.gf}/${fa.ga}.`);
     }
     if (fh && fa) {
@@ -347,16 +347,16 @@ function Match({ g, match }) {
           {formHome && formAway && v && (
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 12 }}>📊 So sánh hai đội</div>
-              <CompareBar label="Điểm phong độ (5 trận)" h={pts(formHome)} a={pts(formAway)} hName={match.teams.home.name} aName={match.teams.away.name} />
+              <CompareBar label="Số trận thắng (trong 10)" h={formHome.w} a={formAway.w} hName={match.teams.home.name} aName={match.teams.away.name} />
               <CompareBar label="Bàn thắng ghi được" h={formHome.gf} a={formAway.gf} hName={match.teams.home.name} aName={match.teams.away.name} />
               <CompareBar label="Bàn thua (ít hơn = tốt)" h={formHome.ga} a={formAway.ga} hName={match.teams.home.name} aName={match.teams.away.name} invert />
               {(() => {
                 const H = match.teams.home.name, A = match.teams.away.name;
                 const lines = [];
-                const pf = pts(formHome), pa = pts(formAway);
-                if (pf > pa) lines.push(`Về phong độ, ${H} đang chơi tốt hơn (${pf} so với ${pa} điểm).`);
-                else if (pa > pf) lines.push(`Về phong độ, ${A} đang chơi tốt hơn (${pa} so với ${pf} điểm).`);
-                else lines.push(`Về phong độ, hai đội ngang nhau (${pf} điểm).`);
+                lines.push(`Trong 10 trận gần nhất, ${H} thắng ${formHome.w}, hòa ${formHome.d}, thua ${formHome.l}; ${A} thắng ${formAway.w}, hòa ${formAway.d}, thua ${formAway.l}.`);
+                if (formHome.w > formAway.w) lines.push(`Xét số trận thắng, ${H} có phong độ tốt hơn.`);
+                else if (formAway.w > formHome.w) lines.push(`Xét số trận thắng, ${A} có phong độ tốt hơn.`);
+                else lines.push(`Hai đội có số trận thắng ngang nhau.`);
                 if (formHome.gf > formAway.gf) lines.push(`Về hàng công, ${H} ghi bàn nhiều hơn (${formHome.gf} so với ${formAway.gf} bàn).`);
                 else if (formAway.gf > formHome.gf) lines.push(`Về hàng công, ${A} ghi bàn nhiều hơn (${formAway.gf} so với ${formHome.gf} bàn).`);
                 else lines.push(`Về hàng công, hai đội ghi bàn ngang nhau (${formHome.gf} bàn).`);
@@ -485,7 +485,7 @@ function FormBox({ t }) {
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, marginBottom: 8 }}><img src={t.logo} width={20} height={20} alt="" /> {t.name}</div>
       <div style={{ fontSize: 13, color: "#9FB0C9" }}>Phong độ gần đây: <b style={{ color: C.text }}>{t.last_5?.form || "—"}</b></div>
-      <div style={{ fontSize: 13, color: "#9FB0C9", marginTop: 4 }}>Ghi/thủng lưới (5 trận): {t.last_5?.goals?.for?.total ?? "—"} / {t.last_5?.goals?.against?.total ?? "—"}</div>
+      <div style={{ fontSize: 13, color: "#9FB0C9", marginTop: 4 }}>Ghi/thủng lưới (10 trận): {t.last_5?.goals?.for?.total ?? "—"} / {t.last_5?.goals?.against?.total ?? "—"}</div>
     </div>
   );
 }
