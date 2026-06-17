@@ -91,7 +91,7 @@ export default function App() {
 
       <header style={{ borderBottom: `1px solid ${C.line}`, padding: "16px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "rgba(11,17,32,.92)", backdropFilter: "blur(8px)", zIndex: 10 }}>
         {view.name !== "groups" && (
-          <button onClick={() => setView(view.name === "match" ? { name: "group", g: view.g } : { name: "groups" })} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", fontSize: 24, lineHeight: 1 }}>‹</button>
+          <button onClick={() => setView(view.name === "match" ? { name: "group", g: view.g } : { name: "groups" })} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", fontSize: 48, lineHeight: 1, padding: "4px 12px", minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
         )}
         <span style={{ fontSize: 22 }}>🏆</span>
         <div style={{ flex: 1 }}>
@@ -100,7 +100,7 @@ export default function App() {
           <div style={{ fontSize: 10, color: C.dim }}>Người viết app: Phạm Anh Khoa</div>
           <div style={{ fontSize: 10, color: C.dim }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa</div>
         </div>
-        <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12 }}>↻</button>
+        <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 12, padding: "12px 16px", cursor: "pointer", fontSize: 24, minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
       </header>
 
       <main style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 28px" }}>
