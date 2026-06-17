@@ -34,6 +34,15 @@ function groupOfTeam(name) {
   return null;
 }
 
+// Lịch sử đối đầu nhập sẵn (dùng khi API-Football không có dữ liệu trận cũ).
+// Mỗi cặp dùng khóa "TÊN1|TÊN2" (xếp theo bảng chữ cái), trong đó "matches" liệt kê các lần gặp.
+const MANUAL_H2H = {};
+
+function manualH2H(nameA, nameB) {
+  const key1 = `${nameA}|${nameB}`, key2 = `${nameB}|${nameA}`;
+  return MANUAL_H2H[key1] || MANUAL_H2H[key2] || null;
+}
+
 function toVN(iso) {
   if (!iso) return { date: "—", time: "—" };
   const d = new Date(iso);
@@ -193,9 +202,12 @@ function Group({ g, fixtures, onOpenMatch }) {
 
 function Match({ g, match }) {
   const [stats, setStats] = useState(null);
+  const [referee, setReferee] = useState(match.fixture.referee || null);
   const [h2h, setH2h] = useState(null);
   const [formHome, setFormHome] = useState(null);
   const [formAway, setFormAway] = useState(null);
+  const [styleHome, setStyleHome] = useState(null);
+  const [styleAway, setStyleAway] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const done = isDone(match);
@@ -223,9 +235,82 @@ function Match({ g, match }) {
     return { w, d, l, gf, ga, seq, recent };
   }
 
+  // Tính lối chơi: lấy thống kê các trận đã đá gần nhất của 1 đội, tính trung bình
+  async function computeStyle(teamFixtures, teamId) {
+    // quét tối đa 6 trận đã đá gần nhất để gom dữ liệu lối chơi (gồm cả trận trước giải)
+    const finished = teamFixtures.filter(fx => ["FT","AET","PEN"].includes(fx.fixture?.status?.short)).slice(0, 6);
+    if (finished.length === 0) return null;
+    const get = (block, type) => {
+      const it = block?.statistics?.find(x => x.type === type);
+      if (!it || it.value == null) return null;
+      if (typeof it.value === "string" && it.value.includes("%")) return parseFloat(it.value);
+      return Number(it.value);
+    };
+    let nPoss = 0, sumPoss = 0, nSh = 0, sumSh = 0, nSot = 0, sumSot = 0, nCor = 0, sumCor = 0, n = 0;
+    for (const fx of finished) {
+      try {
+        const r = await fetch(API("fixtures/statistics", { fixture: fx.fixture.id }));
+        const j = await r.json();
+        const block = (j.response || []).find(s => s.team.id === teamId);
+        if (!block) continue;
+        const poss = get(block, "Ball Possession");
+        const sh = get(block, "Total Shots");
+        const sot = get(block, "Shots on Goal");
+        const cor = get(block, "Corner Kicks");
+        if (poss != null) { sumPoss += poss; nPoss++; }
+        if (sh != null) { sumSh += sh; nSh++; }
+        if (sot != null) { sumSot += sot; nSot++; }
+        if (cor != null) { sumCor += cor; nCor++; }
+        n++;
+      } catch { /* bỏ qua trận lỗi */ }
+    }
+    if (n === 0) return null;
+    return {
+      games: n,
+      poss: nPoss ? Math.round(sumPoss / nPoss) : null,
+      shots: nSh ? +(sumSh / nSh).toFixed(1) : null,
+      sot: nSot ? +(sumSot / nSot).toFixed(1) : null,
+      corners: nCor ? +(sumCor / nCor).toFixed(1) : null,
+    };
+  }
+
+  // Diễn giải lối chơi thành câu
+  function styleText(st, fm, teamName) {
+    if (!st) return null;
+    const parts = [];
+    if (st.poss != null) {
+      if (st.poss >= 55) parts.push(`thiên về kiểm soát bóng (cầm bóng trung bình ${st.poss}%)`);
+      else if (st.poss <= 45) parts.push(`thường nhường bóng, chơi phòng ngự phản công (cầm bóng ${st.poss}%)`);
+      else parts.push(`cân bằng trong kiểm soát bóng (${st.poss}%)`);
+    }
+    if (st.shots != null) {
+      if (st.shots >= 14) parts.push(`dứt điểm nhiều (TB ${st.shots} cú sút/trận)`);
+      else if (st.shots <= 8) parts.push(`ít dứt điểm (TB ${st.shots} cú sút/trận)`);
+      else parts.push(`mức dứt điểm vừa phải (${st.shots} sút/trận)`);
+    }
+    if (st.sot != null) parts.push(`trong đó ~${st.sot} sút trúng đích`);
+    if (st.corners != null) {
+      if (st.corners >= 6) parts.push(`tạo nhiều phạt góc (TB ${st.corners}/trận), cho thấy hay tấn công biên`);
+      else if (st.corners <= 3) parts.push(`ít phạt góc (TB ${st.corners}/trận)`);
+      else parts.push(`phạt góc trung bình ${st.corners}/trận`);
+    }
+    // tấn công/phòng ngự dựa trên bàn thắng/thua từ form
+    if (fm) {
+      if (fm.gf >= fm.l + fm.w && fm.gf >= 12) parts.push(`hàng công mạnh`);
+      if (fm.ga <= 6) parts.push(`hàng thủ chắc chắn`);
+    }
+    return `${teamName} ${parts.join(", ")}.`;
+  }
+
   const load = useCallback(async () => {
     setLoading(true); setErr("");
     try {
+      // Luôn gọi chi tiết trận để lấy trọng tài mới nhất (danh sách fixtures hay để referee = null)
+      fetch(API("fixtures", { id: match.fixture.id }))
+        .then(x => x.json())
+        .then(j => { const ref = j.response?.[0]?.fixture?.referee; if (ref) setReferee(ref); })
+        .catch(() => {});
+
       if (done) {
         const r = await fetch(API("fixtures/statistics", { fixture: match.fixture.id }));
         const j = await r.json(); setStats(j.response || []);
@@ -236,8 +321,13 @@ function Match({ g, match }) {
           fetch(API("fixtures", { team: aId, last: 10 })).then(x => x.json()),
         ]);
         setH2h(rh2h.response || []);
-        setFormHome(summarizeForm(rH.response || [], hId));
-        setFormAway(summarizeForm(rA.response || [], aId));
+        const fHome = summarizeForm(rH.response || [], hId);
+        const fAway = summarizeForm(rA.response || [], aId);
+        setFormHome(fHome);
+        setFormAway(fAway);
+        // Tính lối chơi (nền, không chặn giao diện)
+        computeStyle(rH.response || [], hId).then(s => setStyleHome(s)).catch(() => {});
+        computeStyle(rA.response || [], aId).then(s => setStyleAway(s)).catch(() => {});
       }
     } catch (e) { setErr("Không tải được chi tiết. " + e.message); } finally { setLoading(false); }
   }, [done, match.fixture.id, hId, aId]);
@@ -272,10 +362,30 @@ function Match({ g, match }) {
     if (!fh && !fa) return null;
     const ph = pts(fh), pa = pts(fa);
     const diff = ph - pa;
-    let pick, scoreline;
-    if (Math.abs(diff) <= 1) { pick = "Cân bằng, khó phân thắng bại"; scoreline = "1-1"; }
-    else if (diff > 0) { pick = match.teams.home.name + " được đánh giá cao hơn"; scoreline = "2-1"; }
-    else { pick = match.teams.away.name + " được đánh giá cao hơn"; scoreline = "1-2"; }
+
+    // Dự đoán tỉ số từ dữ liệu thật: trung bình bàn ghi/thủng của mỗi đội trong các trận gần nhất
+    const gamesH = fh ? (fh.w + fh.d + fh.l) : 0;
+    const gamesA = fa ? (fa.w + fa.d + fa.l) : 0;
+    // bàn kỳ vọng của đội nhà = trung bình (đội nhà ghi, đội khách thủng); tương tự cho đội khách
+    const hAtk = gamesH ? fh.gf / gamesH : 1;
+    const hDef = gamesH ? fh.ga / gamesH : 1;
+    const aAtk = gamesA ? fa.gf / gamesA : 1;
+    const aDef = gamesA ? fa.ga / gamesA : 1;
+    let expH = (hAtk + aDef) / 2;
+    let expA = (aAtk + hDef) / 2;
+    // điều chỉnh nhẹ theo chênh lệch phong độ
+    expH += diff * 0.05; expA -= diff * 0.05;
+    let gH = Math.max(0, Math.round(expH));
+    let gA = Math.max(0, Math.round(expA));
+    // tránh mọi trận ra y hệt: nếu hòa nhưng một đội nhỉnh rõ thì cộng 1 bàn cho đội đó
+    if (gH === gA && Math.abs(diff) >= 3) { if (diff > 0) gH++; else gA++; }
+    const scoreline = `${gH}-${gA}`;
+
+    let pick;
+    if (gH > gA) pick = `${match.teams.home.name} được đánh giá nhỉnh hơn`;
+    else if (gA > gH) pick = `${match.teams.away.name} được đánh giá nhỉnh hơn`;
+    else pick = "Cân bằng, nhiều khả năng hòa";
+
     let hWin = 40 + diff * 4, aWin = 40 - diff * 4;
     if (hs && hs.total) { hWin += (hs.hw - hs.aw) * 3; aWin += (hs.aw - hs.hw) * 3; }
     hWin = Math.max(10, Math.min(80, hWin)); aWin = Math.max(10, Math.min(80, aWin));
@@ -321,7 +431,9 @@ function Match({ g, match }) {
           <Side team={match.teams.away} />
         </div>
         <div style={{ textAlign: "center", fontSize: 12, color: C.sub, marginTop: 12 }}>📍 {match.fixture.venue?.name || "—"}</div>
-        {match.fixture.referee && <div style={{ textAlign: "center", fontSize: 12, color: C.gold, marginTop: 6 }}>🧑‍⚖️ Trọng tài: {match.fixture.referee}</div>}
+        {referee
+          ? <div style={{ textAlign: "center", fontSize: 12, color: C.gold, marginTop: 6 }}>🧑‍⚖️ Trọng tài: {referee}</div>
+          : !done && <div style={{ textAlign: "center", fontSize: 12, color: C.dim, marginTop: 6 }}>🧑‍⚖️ Trọng tài: chưa công bố</div>}
       </div>
 
       {loading && <Center>Đang tải chi tiết…</Center>}
@@ -431,8 +543,55 @@ function Match({ g, match }) {
                   );
                 })}
               </>
-            ) : <span style={{ color: C.sub, fontSize: 13 }}>Chưa có dữ liệu đối đầu gần đây giữa hai đội trong hệ thống. Tham khảo phong độ và so sánh ở trên để đánh giá.</span>}
+            ) : (() => {
+              const mh = manualH2H(match.teams.home.name, match.teams.away.name);
+              if (mh) {
+                // tính tổng từ dữ liệu nhập sẵn
+                let hw = 0, aw = 0, dr = 0;
+                for (const m2 of mh.matches) {
+                  const hIsHome = m2.home === match.teams.home.name;
+                  const myG = hIsHome ? m2.hg : m2.ag;
+                  const opG = hIsHome ? m2.ag : m2.hg;
+                  if (myG === opG) dr++;
+                  else if (myG > opG) hw++;
+                  else aw++;
+                }
+                return (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginBottom: 12, fontSize: 13 }}>
+                      <div><div style={{ fontWeight: 800, fontSize: 18, color: C.green }}>{hw}</div><div style={{ color: C.sub }}>{match.teams.home.name} thắng</div></div>
+                      <div><div style={{ fontWeight: 800, fontSize: 18, color: C.gold }}>{dr}</div><div style={{ color: C.sub }}>Hòa</div></div>
+                      <div><div style={{ fontWeight: 800, fontSize: 18, color: "#FF6B7A" }}>{aw}</div><div style={{ color: C.sub }}>{match.teams.away.name} thắng</div></div>
+                    </div>
+                    {mh.matches.map((m2, k) => (
+                      <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid #1A2336`, fontSize: 13 }}>
+                        <span style={{ color: C.sub, minWidth: 120 }}>{m2.comp}</span>
+                        <span style={{ flex: 1, textAlign: "right" }}>{m2.home}</span>
+                        <span style={{ fontWeight: 800, color: C.gold, minWidth: 50, textAlign: "center" }}>{m2.hg}-{m2.ag}</span>
+                        <span style={{ flex: 1, textAlign: "left" }}>{m2.away}</span>
+                      </div>
+                    ))}
+                    {mh.note && <div style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>{mh.note}</div>}
+                  </>
+                );
+              }
+              return <span style={{ color: C.sub, fontSize: 13 }}>Chưa có dữ liệu đối đầu gần đây giữa hai đội trong hệ thống. Tham khảo phong độ và so sánh ở trên để đánh giá.</span>;
+            })()}
           </div>
+
+          {/* Phân tích lối chơi */}
+          {(styleHome || styleAway) && (
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16 }}>
+              <div style={{ fontWeight: 800, marginBottom: 10 }}>🎯 Phân tích lối chơi</div>
+              {styleText(styleHome, formHome, match.teams.home.name) && (
+                <div style={{ fontSize: 14, lineHeight: 1.8, color: "#D5DEEC", marginBottom: 10 }}>• {styleText(styleHome, formHome, match.teams.home.name)}</div>
+              )}
+              {styleText(styleAway, formAway, match.teams.away.name) && (
+                <div style={{ fontSize: 14, lineHeight: 1.8, color: "#D5DEEC" }}>• {styleText(styleAway, formAway, match.teams.away.name)}</div>
+              )}
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 10 }}>Tính từ trung bình các trận đã đá gần nhất. Đầu giải ít trận nên số liệu có thể chưa đầy đủ.</div>
+            </div>
+          )}
 
           {/* Nhận định chữ dài + dự đoán */}
           {v && (
