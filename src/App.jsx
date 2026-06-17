@@ -93,12 +93,12 @@ export default function App() {
         {view.name !== "groups" && (
           <button onClick={() => setView(view.name === "match" ? { name: "group", g: view.g } : { name: "groups" })} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", fontSize: 48, lineHeight: 1, padding: "4px 12px", minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
         )}
-        <span style={{ fontSize: 22 }}>🏆</span>
+        <span style={{ fontSize: 28 }}>🏆</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 800, fontSize: 17 }}>WORLD CUP 2026</div>
-          <div style={{ fontSize: 11, color: C.sub }}>Lịch & phân tích · giờ Việt Nam (UTC+7)</div>
-          <div style={{ fontSize: 10, color: C.dim }}>Người viết app: Phạm Anh Khoa</div>
-          <div style={{ fontSize: 10, color: C.dim }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa</div>
+          <div style={{ fontWeight: 800, fontSize: 20 }}>WORLD CUP 2026</div>
+          <div style={{ fontSize: 15, color: C.text }}>Lịch & phân tích · giờ Việt Nam (UTC+7)</div>
+          <div style={{ fontSize: 14, color: C.sub }}>Người viết app: Phạm Anh Khoa</div>
+          <div style={{ fontSize: 14, color: C.sub }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa</div>
         </div>
         <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 12, padding: "12px 16px", cursor: "pointer", fontSize: 24, minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
       </header>
@@ -366,19 +366,42 @@ function Match({ g, match }) {
     // Dự đoán tỉ số từ dữ liệu thật: trung bình bàn ghi/thủng của mỗi đội trong các trận gần nhất
     const gamesH = fh ? (fh.w + fh.d + fh.l) : 0;
     const gamesA = fa ? (fa.w + fa.d + fa.l) : 0;
-    // bàn kỳ vọng của đội nhà = trung bình (đội nhà ghi, đội khách thủng); tương tự cho đội khách
-    const hAtk = gamesH ? fh.gf / gamesH : 1;
-    const hDef = gamesH ? fh.ga / gamesH : 1;
-    const aAtk = gamesA ? fa.gf / gamesA : 1;
-    const aDef = gamesA ? fa.ga / gamesA : 1;
-    let expH = (hAtk + aDef) / 2;
-    let expA = (aAtk + hDef) / 2;
-    // điều chỉnh nhẹ theo chênh lệch phong độ
-    expH += diff * 0.05; expA -= diff * 0.05;
-    let gH = Math.max(0, Math.round(expH));
-    let gA = Math.max(0, Math.round(expA));
-    // tránh mọi trận ra y hệt: nếu hòa nhưng một đội nhỉnh rõ thì cộng 1 bàn cho đội đó
-    if (gH === gA && Math.abs(diff) >= 3) { if (diff > 0) gH++; else gA++; }
+    // Trung bình bàn ghi/thủng mỗi trận của từng đội (đặt mặc định 1.3 nếu thiếu dữ liệu)
+    const hAtk = gamesH ? fh.gf / gamesH : 1.3;
+    const hDef = gamesH ? fh.ga / gamesH : 1.3;
+    const aAtk = gamesA ? fa.gf / gamesA : 1.3;
+    const aDef = gamesA ? fa.ga / gamesA : 1.3;
+    // Mức ghi bàn trung bình chung của giải, dùng làm "mốc" để so sánh sức mạnh
+    const LEAGUE_AVG = 1.35;
+    // Chỉ số tấn công / phòng ngự so với mặt bằng chung (1 = trung bình, >1 mạnh hơn, <1 yếu hơn)
+    const hAtkR = hAtk / LEAGUE_AVG, hDefR = hDef / LEAGUE_AVG;
+    const aAtkR = aAtk / LEAGUE_AVG, aDefR = aDef / LEAGUE_AVG;
+    // Bàn kỳ vọng = (sức công đội này) × (độ hở hàng thủ đối thủ) × mốc giải
+    // Hàng công mạnh gặp hàng thủ yếu => số nở ra; mạnh gặp thủ chắc => số co lại.
+    let expH = hAtkR * aDefR * LEAGUE_AVG;
+    let expA = aAtkR * hDefR * LEAGUE_AVG;
+    // Lợi thế sân/tinh thần dựa trên chênh lệch phong độ (rõ rệt hơn trước)
+    expH += diff * 0.08;
+    expA -= diff * 0.08;
+    // Đối đầu trực tiếp: đội thắng nhiều hơn trong lịch sử được cộng thêm chút
+    if (hs && hs.total) { expH += (hs.hw - hs.aw) * 0.06; expA += (hs.aw - hs.hw) * 0.06; }
+    expH = Math.max(0, expH);
+    expA = Math.max(0, expA);
+    // Làm tròn nhưng giữ được tỉ số cách biệt: dùng làm tròn có ngưỡng .4 để dễ ra 0,2,3,4 bàn
+    const smartRound = (x) => {
+      const base = Math.floor(x);
+      const frac = x - base;
+      return frac >= 0.45 ? base + 1 : base; // .45 thay vì .5 => dễ lên bàn hơn, đa dạng hơn
+    };
+    let gH = Math.max(0, smartRound(expH));
+    let gA = Math.max(0, smartRound(expA));
+    // Nếu ra hòa nhưng một đội nhỉnh hơn rõ về phong độ thì cộng 1 bàn cho đội đó
+    if (gH === gA && Math.abs(diff) >= 4) { if (diff > 0) gH++; else gA++; }
+    // Nếu một đội vượt trội cả công lẫn thủ mà tỉ số vẫn sát, nới thêm cách biệt
+    if (Math.abs(gH - gA) <= 1) {
+      if (hAtkR + hDefR > aAtkR + aDefR + 1.2 && gH <= gA) gH = gA + 2;
+      else if (aAtkR + aDefR > hAtkR + hDefR + 1.2 && gA <= gH) gA = gH + 2;
+    }
     const scoreline = `${gH}-${gA}`;
 
     let pick;
