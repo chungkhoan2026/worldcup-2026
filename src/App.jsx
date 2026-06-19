@@ -68,7 +68,7 @@ function isSoon24h(iso) {
   return diffMs > 0 && diffMs <= 24 * 3600 * 1000;
 }
 
-const C = { bg: "#0B1120", card: "#121A2B", line: "#1E293B", line2: "#243049", text: "#E7ECF3", sub: "#7E8AA0", dim: "#5A6478", accent: "#E63946", gold: "#FFD166", green: "#4ADE80" };
+const C = { bg: "#0B1120", card: "#121A2B", line: "#1E293B", line2: "#243049", text: "#E7ECF3", sub: "#AEBBD0", dim: "#8C99B0", accent: "#E63946", gold: "#FFD166", green: "#4ADE80" };
 
 export default function App() {
   const [view, setView] = useState({ name: "groups" });
@@ -114,8 +114,8 @@ export default function App() {
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: 20 }}>WORLD CUP 2026</div>
           <div style={{ fontSize: 15, color: C.text }}>Lịch & phân tích · giờ Việt Nam (UTC+7)</div>
-          <div style={{ fontSize: 14, color: C.sub }}>Người viết app: Phạm Anh Khoa</div>
-          <div style={{ fontSize: 14, color: C.sub }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa</div>
+          <div style={{ fontSize: 14, color: C.gold, fontWeight: 700 }}>Người viết app: Phạm Anh Khoa</div>
+          <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ</div>
         </div>
         <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 12, padding: "12px 16px", cursor: "pointer", fontSize: 24, minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
       </header>
@@ -140,10 +140,10 @@ export default function App() {
         )}
       </main>
 
-      <footer style={{ textAlign: "center", padding: "24px 16px", color: C.dim, fontSize: 11, borderTop: `1px solid ${C.line}`, marginTop: 24 }}>
+      <footer style={{ textAlign: "center", padding: "24px 16px", color: C.sub, fontSize: 12, borderTop: `1px solid ${C.line}`, marginTop: 24 }}>
         Dữ liệu: API-Football · cập nhật trực tuyến mỗi khi mở.
-        <div style={{ marginTop: 8, color: C.sub, fontWeight: 700 }}>Người viết app: Phạm Anh Khoa</div>
-        <div style={{ marginTop: 2, color: C.dim }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa</div>
+        <div style={{ marginTop: 8, color: C.gold, fontWeight: 800, fontSize: 15 }}>Người viết app: Phạm Anh Khoa</div>
+        <div style={{ marginTop: 4, color: C.text, fontWeight: 600, fontSize: 14 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ</div>
       </footer>
     </div>
   );
@@ -242,7 +242,7 @@ function Group({ g, fixtures, onOpenMatch }) {
           return (
             <button key={m.fixture.id} onClick={() => onOpenMatch(m)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, color: "inherit" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: C.sub }}>📅 {t.date} &nbsp;🕒 {t.time}</span>
+                <span style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>📅 {t.date} &nbsp;🕒 {t.time}</span>
                 <span className="pill" style={done ? { background: "rgba(34,197,94,.15)", color: C.green } : { background: "rgba(230,57,70,.15)", color: "#FF6B7A" }}>{done ? "ĐÃ ĐÁ" : "CHƯA ĐÁ"}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -250,7 +250,7 @@ function Group({ g, fixtures, onOpenMatch }) {
                 <span style={{ minWidth: 56, textAlign: "center", fontWeight: 800, color: done ? C.gold : C.dim }}>{done ? sc : "vs"}</span>
                 <span style={{ flex: 1, textAlign: "left", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}><img src={m.teams.away.logo} width={22} height={22} alt="" /> {m.teams.away.name}</span>
               </div>
-              <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>📍 {m.fixture.venue?.name || "—"}{m.fixture.venue?.city ? `, ${m.fixture.venue.city}` : ""}</div>
+              <div style={{ fontSize: 13, color: C.sub, marginTop: 8 }}>📍 {m.fixture.venue?.name || "—"}{m.fixture.venue?.city ? `, ${m.fixture.venue.city}` : ""}</div>
             </button>
           );
         })}
@@ -550,7 +550,7 @@ function Match({ g, match }) {
   return (
     <div>
       <div style={{ background: "linear-gradient(135deg,#15203A,#101727)", border: `1px solid ${isLive(match) ? C.accent : C.line2}`, borderRadius: 16, padding: "20px 16px", marginBottom: 16 }}>
-        <div style={{ textAlign: "center", fontSize: 12, color: "#9FB0C9", marginBottom: 8 }}>Bảng {g} · {t.date}/2026 · {t.time} (giờ VN)</div>
+        <div style={{ textAlign: "center", fontSize: 14, color: C.text, fontWeight: 600, marginBottom: 8 }}>Bảng {g} · {t.date}/2026 · {t.time} (giờ VN)</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <Side team={match.teams.home} />
           <div style={{ fontSize: 30, fontWeight: 900, color: done ? C.gold : isLive(match) ? "#FF6B7A" : C.dim, minWidth: 70, textAlign: "center" }}>
@@ -570,7 +570,7 @@ function Match({ g, match }) {
             </span>
           </div>
         )}
-        <div style={{ textAlign: "center", fontSize: 12, color: C.sub, marginTop: 12 }}>📍 {match.fixture.venue?.name || "—"}</div>
+        <div style={{ textAlign: "center", fontSize: 13, color: C.sub, marginTop: 12 }}>📍 {match.fixture.venue?.name || "—"}</div>
         {referee
           ? <div style={{ textAlign: "center", fontSize: 12, color: C.gold, marginTop: 6 }}>🧑‍⚖️ Trọng tài: {referee}</div>
           : !done && <div style={{ textAlign: "center", fontSize: 12, color: C.dim, marginTop: 6 }}>🧑‍⚖️ Trọng tài: chưa công bố</div>}
