@@ -76,8 +76,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadAll = useCallback(async () => {
-    setLoading(true); setError("");
+  const loadAll = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError("");
     try {
       const res = await fetch(API("fixtures", { league: WC_LEAGUE_ID, season: SEASON }));
       const json = await res.json();
@@ -96,11 +97,17 @@ export default function App() {
       }
       setGroups(map);
     } catch (e) {
-      setError("Không tải được dữ liệu. " + e.message);
-    } finally { setLoading(false); }
+      if (!silent) setError("Không tải được dữ liệu. " + e.message);
+    } finally { if (!silent) setLoading(false); }
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Tự động làm mới ngầm danh sách bảng mỗi 30 phút (không làm gián đoạn người đang xem)
+  useEffect(() => {
+    const timer = setInterval(() => loadAll(true), 30 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [loadAll]);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter',system-ui,sans-serif" }}>
@@ -117,7 +124,7 @@ export default function App() {
           <div style={{ fontSize: 14, color: C.gold, fontWeight: 700 }}>Người viết app: Phạm Anh Khoa</div>
           <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ, Trường Cò</div>
         </div>
-        <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 12, padding: "12px 16px", cursor: "pointer", fontSize: 24, minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
+        <button onClick={() => loadAll(false)} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 12, padding: "12px 16px", cursor: "pointer", fontSize: 24, minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
       </header>
 
       <main style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 28px" }}>
@@ -125,7 +132,7 @@ export default function App() {
         {error && !loading && (
           <div style={{ background: "rgba(230,57,70,.1)", border: `1px solid ${C.accent}`, borderRadius: 12, padding: 16, color: "#FF6B7A" }}>
             {error}
-            <button onClick={loadAll} style={{ display: "block", marginTop: 10, background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700 }}>Thử lại</button>
+            <button onClick={() => loadAll(false)} style={{ display: "block", marginTop: 10, background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700 }}>Thử lại</button>
           </div>
         )}
         {!loading && !error && groups && Object.keys(groups).length === 0 && (
