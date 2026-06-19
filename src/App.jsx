@@ -61,6 +61,13 @@ function isToday(iso) {
     && vnNow.getUTCDate() === vnMatch.getUTCDate();
 }
 
+// Trận sắp đá trong vòng 24h tới (tính từ bây giờ), nhưng KHÔNG rơi vào hôm nay (để tránh trùng banner "đá hôm nay")
+function isSoon24h(iso) {
+  if (!iso || isToday(iso)) return false;
+  const diffMs = new Date(iso).getTime() - Date.now();
+  return diffMs > 0 && diffMs <= 24 * 3600 * 1000;
+}
+
 const C = { bg: "#0B1120", card: "#121A2B", line: "#1E293B", line2: "#243049", text: "#E7ECF3", sub: "#7E8AA0", dim: "#5A6478", accent: "#E63946", gold: "#FFD166", green: "#4ADE80" };
 
 export default function App() {
@@ -169,6 +176,10 @@ function Groups({ groups, onOpen }) {
         const todayMatches = groups[id]
           .filter((m) => isToday(m.fixture?.date) && !isDone(m))
           .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+        // Các trận sắp đá trong 24h tới (không tính hôm nay)
+        const soonMatches = groups[id]
+          .filter((m) => isSoon24h(m.fixture?.date) && !isDone(m))
+          .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
         return (
           <button key={id} onClick={() => onOpen(id)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
@@ -186,6 +197,22 @@ function Groups({ groups, onOpen }) {
                   return (
                     <div key={m.fixture.id} style={{ fontSize: 13, color: C.text, fontWeight: 600, padding: "2px 0" }}>
                       🕒 <b style={{ color: C.gold }}>{tt.time}</b> · {m.teams.home.name} <span style={{ color: C.sub }}>vs</span> {m.teams.away.name}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {soonMatches.length > 0 && (
+              <div style={{ background: "rgba(255,209,102,.10)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                  <span style={{ fontSize: 13 }}>⏳</span>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: C.gold, letterSpacing: ".5px" }}>SẮP ĐÁ (trong 24h)</span>
+                </div>
+                {soonMatches.map((m) => {
+                  const tt = toVN(m.fixture.date);
+                  return (
+                    <div key={m.fixture.id} style={{ fontSize: 13, color: C.text, fontWeight: 600, padding: "2px 0" }}>
+                      🕒 <b style={{ color: C.gold }}>{tt.date} · {tt.time}</b> · {m.teams.home.name} <span style={{ color: C.sub }}>vs</span> {m.teams.away.name}
                     </div>
                   );
                 })}
