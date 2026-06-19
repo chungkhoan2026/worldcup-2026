@@ -468,17 +468,21 @@ function Match({ g, match }) {
 
   function h2hSummary() {
     if (!h2h) return null;
-    let hw = 0, aw = 0, dr = 0;
+    let hw = 0, aw = 0, dr = 0, gdSum = 0; // gdSum = tổng hiệu số bàn (dương = nghiêng đội nhà hId)
     for (const fx of h2h) {
       if (fx.goals.home == null) continue;
       const homeWin = fx.goals.home > fx.goals.away;
       const draw = fx.goals.home === fx.goals.away;
       const winnerIsHomeTeam = fx.teams.home.id === hId ? homeWin : !homeWin && !draw;
+      // Hiệu số bàn xét theo góc nhìn đội hId
+      const myG = fx.teams.home.id === hId ? fx.goals.home : fx.goals.away;
+      const opG = fx.teams.home.id === hId ? fx.goals.away : fx.goals.home;
+      gdSum += (myG - opG);
       if (draw) dr++;
       else if (winnerIsHomeTeam) hw++;
       else aw++;
     }
-    return { hw, aw, dr, total: hw + aw + dr };
+    return { hw, aw, dr, total: hw + aw + dr, gdSum };
   }
 
   // điểm phong độ (thắng 3, hòa 1)
@@ -508,10 +512,17 @@ function Match({ g, match }) {
     let expH = hAtkR * aDefR * LEAGUE_AVG;
     let expA = aAtkR * hDefR * LEAGUE_AVG;
     // Lợi thế sân/tinh thần dựa trên chênh lệch phong độ (rõ rệt hơn trước)
-    expH += diff * 0.08;
-    expA -= diff * 0.08;
-    // Đối đầu trực tiếp: đội thắng nhiều hơn trong lịch sử được cộng thêm chút
-    if (hs && hs.total) { expH += (hs.hw - hs.aw) * 0.06; expA += (hs.aw - hs.hw) * 0.06; }
+    expH += diff * 0.10;
+    expA -= diff * 0.10;
+    // Đối đầu trực tiếp: vừa tính SỐ TRẬN thắng, vừa tính MỨC THẮNG ĐẬM (hiệu số bàn) trong lịch sử
+    if (hs && hs.total) {
+      expH += (hs.hw - hs.aw) * 0.10;
+      expA += (hs.aw - hs.hw) * 0.10;
+      // Trung bình hiệu số bàn trong các lần gặp nhau: thắng càng đậm thì cộng càng nhiều (giới hạn để không quá đà)
+      const avgGd = hs.gdSum / hs.total;
+      expH += Math.max(-1.2, Math.min(1.2, avgGd * 0.30));
+      expA -= Math.max(-1.2, Math.min(1.2, avgGd * 0.30));
+    }
     expH = Math.max(0, expH);
     expA = Math.max(0, expA);
     // Làm tròn nhưng giữ được tỉ số cách biệt: dùng làm tròn có ngưỡng .4 để dễ ra 0,2,3,4 bàn
@@ -523,11 +534,20 @@ function Match({ g, match }) {
     let gH = Math.max(0, smartRound(expH));
     let gA = Math.max(0, smartRound(expA));
     // Nếu ra hòa nhưng một đội nhỉnh hơn rõ về phong độ thì cộng 1 bàn cho đội đó
-    if (gH === gA && Math.abs(diff) >= 4) { if (diff > 0) gH++; else gA++; }
-    // Nếu một đội vượt trội cả công lẫn thủ mà tỉ số vẫn sát, nới thêm cách biệt
-    if (Math.abs(gH - gA) <= 1) {
-      if (hAtkR + hDefR > aAtkR + aDefR + 1.2 && gH <= gA) gH = gA + 2;
-      else if (aAtkR + aDefR > hAtkR + hDefR + 1.2 && gA <= gH) gA = gH + 2;
+    if (gH === gA && Math.abs(diff) >= 3) { if (diff > 0) gH++; else gA++; }
+    // "Điểm vượt trội tổng hợp": gộp công, thủ, phong độ, đối đầu để đo mức chênh lệch đẳng cấp
+    const domH = (hAtkR + hDefR) + diff * 0.10 + (hs && hs.total ? (hs.hw - hs.aw) * 0.3 + (hs.gdSum / hs.total) * 0.3 : 0);
+    const domA = (aAtkR + aDefR) - diff * 0.10 + (hs && hs.total ? (hs.aw - hs.hw) * 0.3 - (hs.gdSum / hs.total) * 0.3 : 0);
+    const domGap = domH - domA;
+    // Nếu một đội vượt trội rõ rệt mà tỉ số dự đoán vẫn sát, nới cách biệt cho đúng thực tế
+    if (Math.abs(domGap) >= 1.0 && Math.abs(gH - gA) <= 1) {
+      if (domGap > 0) gH = Math.max(gH, gA + 2);
+      else gA = Math.max(gA, gH + 2);
+    }
+    // Đội vượt trội cực mạnh (chênh rất lớn) => đảm bảo cách biệt tối thiểu 3 bàn
+    if (Math.abs(domGap) >= 2.2) {
+      if (domGap > 0 && gH - gA < 3) gH = gA + 3;
+      else if (domGap < 0 && gA - gH < 3) gA = gH + 3;
     }
     const scoreline = `${gH}-${gA}`;
 
@@ -536,10 +556,12 @@ function Match({ g, match }) {
     else if (gA > gH) pick = `${match.teams.away.name} được đánh giá nhỉnh hơn`;
     else pick = "Cân bằng, nhiều khả năng hòa";
 
-    let hWin = 40 + diff * 4, aWin = 40 - diff * 4;
-    if (hs && hs.total) { hWin += (hs.hw - hs.aw) * 3; aWin += (hs.aw - hs.hw) * 3; }
-    hWin = Math.max(10, Math.min(80, hWin)); aWin = Math.max(10, Math.min(80, aWin));
-    const drawP = Math.max(10, 100 - hWin - aWin);
+    // Tỉ lệ thắng dựa trên mức vượt trội tổng hợp (đã gồm công, thủ, phong độ, đối đầu)
+    let hWin = 38 + diff * 3 + domGap * 7;
+    let aWin = 38 - diff * 3 - domGap * 7;
+    if (hs && hs.total) { hWin += (hs.hw - hs.aw) * 2; aWin += (hs.aw - hs.hw) * 2; }
+    hWin = Math.max(8, Math.min(85, hWin)); aWin = Math.max(8, Math.min(85, aWin));
+    const drawP = Math.max(8, 100 - hWin - aWin);
     const sum = hWin + aWin + drawP;
     const pHome = Math.round(hWin / sum * 100), pDraw = Math.round(drawP / sum * 100), pAway = Math.round(aWin / sum * 100);
 
