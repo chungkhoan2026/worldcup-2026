@@ -390,6 +390,19 @@ function Match({ g, match }) {
       if (done) {
         const r = await fetch(API("fixtures/statistics", { fixture: match.fixture.id }));
         const j = await r.json(); setStats(j.response || []);
+        // Tải thêm phong độ + đối đầu để chấm xem dự đoán của app đúng hay sai.
+        // Quan trọng: loại bỏ CHÍNH trận này khỏi dữ liệu, để dự đoán "như thể chưa biết kết quả".
+        try {
+          const [rh2h, rH, rA] = await Promise.all([
+            fetch(API("fixtures/headtohead", { h2h: `${hId}-${aId}`, last: 12 })).then(x => x.json()),
+            fetch(API("fixtures", { team: hId, last: 12 })).then(x => x.json()),
+            fetch(API("fixtures", { team: aId, last: 12 })).then(x => x.json()),
+          ]);
+          const exclude = (arr) => (arr || []).filter(fx => fx.fixture?.id !== match.fixture.id);
+          setH2h(exclude(rh2h.response));
+          setFormHome(summarizeForm(exclude(rH.response), hId));
+          setFormAway(summarizeForm(exclude(rA.response), aId));
+        } catch { /* nếu lỗi thì bỏ qua phần chấm điểm */ }
       } else {
         const [rh2h, rH, rA] = await Promise.all([
           fetch(API("fixtures/headtohead", { h2h: `${hId}-${aId}`, last: 10 })).then(x => x.json()),
@@ -528,7 +541,61 @@ function Match({ g, match }) {
     hWin = Math.max(10, Math.min(80, hWin)); aWin = Math.max(10, Math.min(80, aWin));
     const drawP = Math.max(10, 100 - hWin - aWin);
     const sum = hWin + aWin + drawP;
-    return { pick, scoreline, diff, pHome: Math.round(hWin/sum*100), pDraw: Math.round(drawP/sum*100), pAway: Math.round(aWin/sum*100) };
+    const pHome = Math.round(hWin / sum * 100), pDraw = Math.round(drawP / sum * 100), pAway = Math.round(aWin / sum * 100);
+
+    const H = match.teams.home.name, A = match.teams.away.name;
+
+    // GIẢI THÍCH CĂN CỨ: vì sao ra tỉ số và % này
+    const reasons = [];
+    // 1) Trung bình bàn thắng/thua
+    reasons.push(`Trung bình mỗi trận: ${H} ghi ${hAtk.toFixed(1)} bàn, thủng ${hDef.toFixed(1)} bàn; ${A} ghi ${aAtk.toFixed(1)} bàn, thủng ${aDef.toFixed(1)} bàn.`);
+    // 2) Hàng công gặp hàng thủ
+    if (hAtk > aDef + 0.3) reasons.push(`Hàng công ${H} (${hAtk.toFixed(1)}) mạnh hơn mức thủng lưới của ${A} (${aDef.toFixed(1)}), nên ${H} có lợi thế ghi bàn.`);
+    else if (aAtk > hDef + 0.3) reasons.push(`Hàng công ${A} (${aAtk.toFixed(1)}) mạnh hơn mức thủng lưới của ${H} (${hDef.toFixed(1)}), nên ${A} có lợi thế ghi bàn.`);
+    else reasons.push(`Sức công của hai đội tương đương khả năng phòng ngự của đối thủ, nên tỉ số dự đoán không chênh lệch nhiều.`);
+    // 3) Phong độ
+    if (Math.abs(diff) >= 4) reasons.push(`${diff > 0 ? H : A} có phong độ tốt hơn hẳn trong 10 trận gần đây (chênh ${Math.abs(diff)} điểm), được cộng thêm lợi thế.`);
+    else if (Math.abs(diff) >= 1) reasons.push(`${diff > 0 ? H : A} nhỉnh hơn đôi chút về phong độ gần đây.`);
+    else reasons.push(`Phong độ hai đội khá cân bằng.`);
+    // 4) Đối đầu
+    if (hs && hs.total) {
+      if (hs.hw > hs.aw) reasons.push(`Lịch sử đối đầu: ${H} thắng ${hs.hw}, ${A} thắng ${hs.aw}, hòa ${hs.dr} — nghiêng về ${H}.`);
+      else if (hs.aw > hs.hw) reasons.push(`Lịch sử đối đầu: ${A} thắng ${hs.aw}, ${H} thắng ${hs.hw}, hòa ${hs.dr} — nghiêng về ${A}.`);
+      else reasons.push(`Lịch sử đối đầu khá cân bằng (${hs.hw}-${hs.dr}-${hs.aw}).`);
+    }
+
+    // LỜI KHUYÊN / KẾT LUẬN
+    const fav = pHome > pAway ? H : pAway > pHome ? A : null;
+    const favPct = Math.max(pHome, pAway);
+    let advice;
+    if (!fav || Math.abs(pHome - pAway) < 8) {
+      advice = `Đây là trận cân tài cân sức, rất khó đoán. Khả năng hòa hoặc một đội thắng sít sao đều cao — người xem nên theo dõi cả trận.`;
+    } else if (favPct >= 55) {
+      advice = `${fav} được đánh giá cao hơn rõ rệt (${favPct}% thắng) và nhiều khả năng giành trọn 3 điểm. Tuy nhiên bóng đá luôn có bất ngờ.`;
+    } else {
+      advice = `${fav} nhỉnh hơn (${favPct}% thắng) nhưng không áp đảo. Đối thủ vẫn hoàn toàn có cơ hội tạo bất ngờ nếu tận dụng tốt cơ hội.`;
+    }
+
+    return { pick, scoreline, diff, pHome, pDraw, pAway, reasons, advice };
+  }
+
+  // Chấm điểm: so dự đoán của app với kết quả THẬT của trận đã đá
+  function review() {
+    if (!done || (!formHome && !formAway)) return null;
+    const v = verdict();
+    if (!v) return null;
+    const realH = match.goals?.home, realA = match.goals?.away;
+    if (realH == null || realA == null) return null;
+    // Kết quả thật: ai thắng?
+    const realOutcome = realH > realA ? "home" : realA > realH ? "away" : "draw";
+    // Dự đoán của app (từ tỉ số dự đoán)
+    const [pgH, pgA] = v.scoreline.split("-").map(Number);
+    const predOutcome = pgH > pgA ? "home" : pgA > pgH ? "away" : "draw";
+    const outcomeOk = realOutcome === predOutcome;       // đoán đúng đội thắng/hòa
+    const exactOk = pgH === realH && pgA === realA;        // đoán đúng cả tỉ số
+    const H = match.teams.home.name, A = match.teams.away.name;
+    const realLabel = realOutcome === "home" ? `${H} thắng` : realOutcome === "away" ? `${A} thắng` : "Hòa";
+    return { outcomeOk, exactOk, predScore: v.scoreline, realScore: `${realH}-${realA}`, realLabel, predPick: v.pick };
   }
 
   // Nhận định chữ dài, có lý lẽ
@@ -557,6 +624,7 @@ function Match({ g, match }) {
 
   const seqColor = (c) => c === "T" ? C.green : c === "B" ? "#FF6B7A" : C.gold;
   const v = !done ? verdict() : null;
+  const rev = done ? review() : null;
 
   return (
     <div>
@@ -657,6 +725,23 @@ function Match({ g, match }) {
             </div>
           ))}
           {stats.length === 0 && <div style={{ color: C.sub, fontSize: 13 }}>Chưa có số liệu thống kê cho trận này.</div>}
+        </div>
+      )}
+
+      {done && !loading && rev && (
+        <div style={{ background: rev.outcomeOk ? "rgba(34,197,94,.10)" : "rgba(230,57,70,.10)", border: `1px solid ${rev.outcomeOk ? C.green : C.accent}`, borderRadius: 14, padding: 16, marginTop: 14 }}>
+          <div style={{ fontWeight: 800, marginBottom: 10, color: rev.outcomeOk ? C.green : "#FF6B7A" }}>
+            {rev.exactOk ? "🎯 App dự đoán CHÍNH XÁC tỉ số!" : rev.outcomeOk ? "✅ App dự đoán đúng kết quả" : "❌ App dự đoán chưa chính xác"}
+          </div>
+          <div style={{ fontSize: 14, lineHeight: 1.7, color: "#D5DEEC" }}>
+            App dự đoán: <b style={{ color: C.gold }}>{rev.predScore}</b> ({rev.predPick}).<br />
+            Kết quả thật: <b style={{ color: C.gold }}>{rev.realScore}</b> ({rev.realLabel}).<br />
+            {rev.exactOk
+              ? "App đoán đúng cả tỉ số chính xác — quá tài!"
+              : rev.outcomeOk
+              ? "App đoán đúng đội thắng/hòa, nhưng tỉ số cụ thể có chênh lệch."
+              : "App đoán sai lần này. Kết quả bóng đá luôn có bất ngờ, dự đoán chỉ mang tính tham khảo."}
+          </div>
         </div>
       )}
 
@@ -806,12 +891,31 @@ function Match({ g, match }) {
               <div style={{ fontWeight: 800, marginBottom: 10, color: C.gold }}>✨ Nhận định & dự đoán</div>
               {analysisText() && <div style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 12, color: "#D5DEEC" }}>{analysisText()}</div>}
               <div style={{ fontSize: 14, marginBottom: 12 }}>Đánh giá chung: <b>{v.pick}</b>. Dự đoán tỉ số: <b style={{ color: C.gold }}>{v.scoreline}</b>.</div>
-              <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center" }}>
+              <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginBottom: 14 }}>
                 <Pred label={match.teams.home.name} value={v.pHome + "%"} />
                 <Pred label="Hòa" value={v.pDraw + "%"} />
                 <Pred label={match.teams.away.name} value={v.pAway + "%"} />
               </div>
-              <div style={{ fontSize: 11, color: C.dim, marginTop: 12, textAlign: "center" }}>Nhận định tự động dựa trên dữ liệu phong độ thật từ API-Football, mang tính tham khảo.</div>
+
+              {v.reasons && v.reasons.length > 0 && (
+                <div style={{ background: "rgba(255,255,255,.04)", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: C.gold, marginBottom: 8 }}>📌 Vì sao có dự đoán này?</div>
+                  {v.reasons.map((rs, i) => (
+                    <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: "#D5DEEC", marginBottom: 5, display: "flex", gap: 6 }}>
+                      <span style={{ color: C.gold }}>•</span><span>{rs}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {v.advice && (
+                <div style={{ background: "rgba(255,209,102,.10)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: C.gold, marginBottom: 6 }}>💡 Lời khuyên</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.7, color: "#E7ECF3" }}>{v.advice}</div>
+                </div>
+              )}
+
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 4, textAlign: "center" }}>Nhận định tự động dựa trên dữ liệu phong độ thật từ API-Football, mang tính tham khảo.</div>
             </div>
           )}
         </div>
