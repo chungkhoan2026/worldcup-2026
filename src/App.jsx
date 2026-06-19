@@ -104,7 +104,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter',system-ui,sans-serif" }}>
-      <style>{`*{box-sizing:border-box}.card{transition:transform .15s,border-color .15s}.card:hover{transform:translateY(-2px);border-color:${C.accent}!important}@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin 1s linear infinite;display:inline-block}.pill{font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:999px}button{font-family:inherit}@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}@keyframes liveGlow{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.6)}50%{box-shadow:0 0 14px 3px rgba(230,57,70,.85)}}.live-banner{animation:liveGlow 1.3s ease-in-out infinite}.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF3B3B;animation:blink 1s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.card{transition:none}.spin{animation:none}.live-banner{animation:none}.live-dot{animation:none}}`}</style>
+      <style>{`*{box-sizing:border-box}.card{transition:transform .15s,border-color .15s}.card:hover{transform:translateY(-2px);border-color:${C.accent}!important}@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin 1s linear infinite;display:inline-block}.pill{font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:999px}button{font-family:inherit}@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}@keyframes liveGlow{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.6)}50%{box-shadow:0 0 14px 3px rgba(230,57,70,.85)}}.live-banner{animation:liveGlow 1.3s ease-in-out infinite}.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF3B3B;animation:blink 1s ease-in-out infinite}.soon-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FFD166;animation:blink 1.4s ease-in-out infinite}.blink-text{animation:blink 1s ease-in-out infinite}.blink-text-soft{animation:blink 1.4s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.card{transition:none}.spin{animation:none}.live-banner{animation:none}.live-dot{animation:none}.soon-dot{animation:none}.blink-text{animation:none}.blink-text-soft{animation:none}}`}</style>
 
       <header style={{ borderBottom: `1px solid ${C.line}`, padding: "16px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "rgba(11,17,32,.92)", backdropFilter: "blur(8px)", zIndex: 10 }}>
         {view.name !== "groups" && (
@@ -238,12 +238,23 @@ function Group({ g, fixtures, onOpenMatch }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {sorted.map((m) => {
           const t = toVN(m.fixture.date); const done = isDone(m);
+          const live = isLive(m); const today = !done && !live && isToday(m.fixture?.date); const soon = !done && !live && isSoon24h(m.fixture?.date);
           const sc = `${m.goals.home ?? "-"}-${m.goals.away ?? "-"}`;
           return (
-            <button key={m.fixture.id} onClick={() => onOpenMatch(m)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, color: "inherit" }}>
+            <button key={m.fixture.id} onClick={() => onOpenMatch(m)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${live ? C.accent : today ? C.accent : C.line}`, borderRadius: 14, padding: 14, color: "inherit" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>📅 {t.date} &nbsp;🕒 {t.time}</span>
-                <span className="pill" style={done ? { background: "rgba(34,197,94,.15)", color: C.green } : { background: "rgba(230,57,70,.15)", color: "#FF6B7A" }}>{done ? "ĐÃ ĐÁ" : "CHƯA ĐÁ"}</span>
+                <span className={(live || today) ? "blink-text" : soon ? "blink-text-soft" : ""} style={{ fontSize: 14, color: (live || today) ? "#FF6B7A" : soon ? C.gold : C.text, fontWeight: (live || today || soon) ? 800 : 600 }}>📅 {t.date} &nbsp;🕒 {t.time}</span>
+                {live ? (
+                  <span className="pill" style={{ background: "rgba(230,57,70,.2)", color: "#FF6B7A", display: "inline-flex", alignItems: "center", gap: 5 }}><span className="live-dot" /> ĐANG ĐÁ</span>
+                ) : done ? (
+                  <span className="pill" style={{ background: "rgba(34,197,94,.15)", color: C.green }}>ĐÃ ĐÁ</span>
+                ) : today ? (
+                  <span className="pill" style={{ background: "rgba(230,57,70,.15)", color: "#FF6B7A", display: "inline-flex", alignItems: "center", gap: 5 }}><span className="live-dot" /> HÔM NAY</span>
+                ) : soon ? (
+                  <span className="pill" style={{ background: "rgba(255,209,102,.15)", color: C.gold, display: "inline-flex", alignItems: "center", gap: 5 }}><span className="soon-dot" /> SẮP ĐÁ</span>
+                ) : (
+                  <span className="pill" style={{ background: "rgba(230,57,70,.15)", color: "#FF6B7A" }}>CHƯA ĐÁ</span>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <span style={{ flex: 1, textAlign: "right", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>{m.teams.home.name} <img src={m.teams.home.logo} width={22} height={22} alt="" /></span>
