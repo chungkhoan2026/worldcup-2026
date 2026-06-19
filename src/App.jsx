@@ -51,6 +51,16 @@ function toVN(iso) {
   return { date: `${p(vn.getUTCDate())}/${p(vn.getUTCMonth() + 1)}`, time: `${p(vn.getUTCHours())}:${p(vn.getUTCMinutes())}` };
 }
 
+// Kiểm tra một trận có diễn ra "hôm nay" theo giờ Việt Nam hay không
+function isToday(iso) {
+  if (!iso) return false;
+  const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
+  const vnMatch = new Date(new Date(iso).getTime() + 7 * 3600 * 1000);
+  return vnNow.getUTCFullYear() === vnMatch.getUTCFullYear()
+    && vnNow.getUTCMonth() === vnMatch.getUTCMonth()
+    && vnNow.getUTCDate() === vnMatch.getUTCDate();
+}
+
 const C = { bg: "#0B1120", card: "#121A2B", line: "#1E293B", line2: "#243049", text: "#E7ECF3", sub: "#7E8AA0", dim: "#5A6478", accent: "#E63946", gold: "#FFD166", green: "#4ADE80" };
 
 export default function App() {
@@ -87,7 +97,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter',system-ui,sans-serif" }}>
-      <style>{`*{box-sizing:border-box}.card{transition:transform .15s,border-color .15s}.card:hover{transform:translateY(-2px);border-color:${C.accent}!important}@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin 1s linear infinite;display:inline-block}.pill{font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:999px}button{font-family:inherit}@media(prefers-reduced-motion:reduce){.card{transition:none}.spin{animation:none}}`}</style>
+      <style>{`*{box-sizing:border-box}.card{transition:transform .15s,border-color .15s}.card:hover{transform:translateY(-2px);border-color:${C.accent}!important}@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin 1s linear infinite;display:inline-block}.pill{font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:999px}button{font-family:inherit}@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}@keyframes liveGlow{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.6)}50%{box-shadow:0 0 14px 3px rgba(230,57,70,.85)}}.live-banner{animation:liveGlow 1.3s ease-in-out infinite}.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF3B3B;animation:blink 1s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.card{transition:none}.spin{animation:none}.live-banner{animation:none}.live-dot{animation:none}}`}</style>
 
       <header style={{ borderBottom: `1px solid ${C.line}`, padding: "16px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "rgba(11,17,32,.92)", backdropFilter: "blur(8px)", zIndex: 10 }}>
         {view.name !== "groups" && (
@@ -145,6 +155,8 @@ function teamsOf(fixtures) {
   return Object.values(seen).slice(0, 4);
 }
 function isDone(m) { return ["FT", "AET", "PEN"].includes(m.fixture?.status?.short); }
+// Trận đang diễn ra (bao gồm hiệp 1, nghỉ giữa hiệp, hiệp 2, hiệp phụ, loạt luân lưu)
+function isLive(m) { return ["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"].includes(m.fixture?.status?.short); }
 
 function Groups({ groups, onOpen }) {
   const ids = Object.keys(groups).sort();
@@ -153,12 +165,32 @@ function Groups({ groups, onOpen }) {
       {ids.map((id) => {
         const teams = teamsOf(groups[id]);
         const done = groups[id].filter(isDone).length;
+        // Các trận của bảng này diễn ra hôm nay (theo giờ VN), chưa đá xong, sắp theo giờ
+        const todayMatches = groups[id]
+          .filter((m) => isToday(m.fixture?.date) && !isDone(m))
+          .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
         return (
           <button key={id} onClick={() => onOpen(id)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
               <span style={{ fontWeight: 800, fontSize: 18, color: C.accent }}>Bảng {id}</span>
               <span className="pill" style={{ background: C.line, color: "#9FB0C9" }}>{done}/{groups[id].length} đã đá</span>
             </div>
+            {todayMatches.length > 0 && (
+              <div className="live-banner" style={{ background: "rgba(230,57,70,.14)", border: `1px solid ${C.accent}`, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: todayMatches.length ? 6 : 0 }}>
+                  <span className="live-dot" />
+                  <span style={{ fontWeight: 800, fontSize: 13, color: "#FF6B7A", letterSpacing: ".5px" }}>ĐÁ HÔM NAY</span>
+                </div>
+                {todayMatches.map((m) => {
+                  const tt = toVN(m.fixture.date);
+                  return (
+                    <div key={m.fixture.id} style={{ fontSize: 13, color: C.text, fontWeight: 600, padding: "2px 0" }}>
+                      🕒 <b style={{ color: C.gold }}>{tt.time}</b> · {m.teams.home.name} <span style={{ color: C.sub }}>vs</span> {m.teams.away.name}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {teams.map((t) => (
               <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", fontSize: 16 }}>
                 <img src={t.logo} alt="" width={24} height={24} style={{ objectFit: "contain" }} /><span>{t.name}</span>
@@ -210,6 +242,12 @@ function Match({ g, match }) {
   const [styleAway, setStyleAway] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  // Dữ liệu trực tiếp khi trận đang đá
+  const [live, setLive] = useState(null);        // { status, elapsed, gh, ga }
+  const [events, setEvents] = useState([]);       // diễn biến: bàn thắng, thẻ
+  const [liveStats, setLiveStats] = useState([]); // thống kê hiện tại
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
   const done = isDone(match);
   const t = toVN(match.fixture.date);
   const hId = match.teams.home.id, aId = match.teams.away.id;
@@ -333,6 +371,44 @@ function Match({ g, match }) {
   }, [done, match.fixture.id, hId, aId]);
   useEffect(() => { load(); }, [load]);
 
+  // Tải dữ liệu TRỰC TIẾP: tỉ số hiện tại, phút thi đấu, diễn biến, thống kê live
+  const loadLive = useCallback(async () => {
+    setLiveLoading(true);
+    try {
+      const [rFix, rEv, rSt] = await Promise.all([
+        fetch(API("fixtures", { id: match.fixture.id })).then(x => x.json()),
+        fetch(API("fixtures/events", { fixture: match.fixture.id })).then(x => x.json()),
+        fetch(API("fixtures/statistics", { fixture: match.fixture.id })).then(x => x.json()),
+      ]);
+      const fx = rFix.response?.[0];
+      if (fx) {
+        setLive({
+          status: fx.fixture?.status?.short,
+          elapsed: fx.fixture?.status?.elapsed,
+          gh: fx.goals?.home,
+          ga: fx.goals?.away,
+        });
+        if (fx.fixture?.referee) setReferee(fx.fixture.referee);
+      }
+      setEvents(rEv.response || []);
+      setLiveStats(rSt.response || []);
+      setLastUpdate(new Date());
+    } catch { /* bỏ qua lỗi tạm thời, lần làm mới sau sẽ thử lại */ }
+    finally { setLiveLoading(false); }
+  }, [match.fixture.id]);
+
+  // Khi trận đang đá: tải ngay + tự động làm mới mỗi 45 giây. Ngừng khi rời trang hoặc trận kết thúc.
+  useEffect(() => {
+    if (!isLive(match)) return;
+    loadLive();
+    const timer = setInterval(loadLive, 60000);
+    return () => clearInterval(timer);
+  }, [match, loadLive]);
+
+  // Tỉ số hiện tại (ưu tiên dữ liệu live mới nhất, nếu chưa có thì lấy từ match ban đầu)
+  const liveStatLabel = { "1H": "Hiệp 1", "HT": "Nghỉ giữa hiệp", "2H": "Hiệp 2", "ET": "Hiệp phụ", "BT": "Nghỉ hiệp phụ", "P": "Luân lưu", "LIVE": "Đang đá", "INT": "Tạm dừng" };
+
+
   const stat = (teamId, type) => {
     const block = stats?.find((s) => s.team.id === teamId);
     const item = block?.statistics?.find((x) => x.type === type);
@@ -446,20 +522,90 @@ function Match({ g, match }) {
 
   return (
     <div>
-      <div style={{ background: "linear-gradient(135deg,#15203A,#101727)", border: `1px solid ${C.line2}`, borderRadius: 16, padding: "20px 16px", marginBottom: 16 }}>
+      <div style={{ background: "linear-gradient(135deg,#15203A,#101727)", border: `1px solid ${isLive(match) ? C.accent : C.line2}`, borderRadius: 16, padding: "20px 16px", marginBottom: 16 }}>
         <div style={{ textAlign: "center", fontSize: 12, color: "#9FB0C9", marginBottom: 8 }}>Bảng {g} · {t.date}/2026 · {t.time} (giờ VN)</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <Side team={match.teams.home} />
-          <div style={{ fontSize: 30, fontWeight: 900, color: done ? C.gold : C.dim, minWidth: 70, textAlign: "center" }}>{done ? `${match.goals.home}-${match.goals.away}` : "—"}</div>
+          <div style={{ fontSize: 30, fontWeight: 900, color: done ? C.gold : isLive(match) ? "#FF6B7A" : C.dim, minWidth: 70, textAlign: "center" }}>
+            {done ? `${match.goals.home}-${match.goals.away}`
+              : isLive(match) ? `${live?.gh ?? match.goals.home ?? 0}-${live?.ga ?? match.goals.away ?? 0}`
+              : "—"}
+          </div>
           <Side team={match.teams.away} />
         </div>
+        {isLive(match) && (
+          <div style={{ textAlign: "center", marginTop: 10 }}>
+            <span className="live-banner" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(230,57,70,.18)", border: `1px solid ${C.accent}`, borderRadius: 999, padding: "4px 14px" }}>
+              <span className="live-dot" />
+              <span style={{ fontWeight: 800, fontSize: 13, color: "#FF6B7A" }}>
+                {liveStatLabel[live?.status] || "ĐANG ĐÁ"}{live?.elapsed != null ? ` · phút ${live.elapsed}'` : ""}
+              </span>
+            </span>
+          </div>
+        )}
         <div style={{ textAlign: "center", fontSize: 12, color: C.sub, marginTop: 12 }}>📍 {match.fixture.venue?.name || "—"}</div>
         {referee
           ? <div style={{ textAlign: "center", fontSize: 12, color: C.gold, marginTop: 6 }}>🧑‍⚖️ Trọng tài: {referee}</div>
           : !done && <div style={{ textAlign: "center", fontSize: 12, color: C.dim, marginTop: 6 }}>🧑‍⚖️ Trọng tài: chưa công bố</div>}
       </div>
 
-      {loading && <Center>Đang tải chi tiết…</Center>}
+      {isLive(match) && (
+        <div style={{ background: C.card, border: `1px solid ${C.accent}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <span style={{ fontWeight: 800, color: "#FF6B7A", display: "flex", alignItems: "center", gap: 7 }}>
+              <span className="live-dot" /> Diễn biến trực tiếp
+            </span>
+            <button onClick={loadLive} disabled={liveLoading} style={{ background: liveLoading ? C.line : C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 12px", cursor: liveLoading ? "default" : "pointer", fontWeight: 700, fontSize: 13 }}>
+              {liveLoading ? "Đang cập nhật…" : "↻ Cập nhật ngay"}
+            </button>
+          </div>
+
+          {lastUpdate && (
+            <div style={{ fontSize: 11, color: C.dim, marginBottom: 12 }}>
+              Tự động làm mới mỗi 60 giây · Cập nhật lúc {toVN(lastUpdate.toISOString()).time}
+            </div>
+          )}
+
+          {/* Diễn biến: bàn thắng, thẻ vàng/đỏ theo thứ tự thời gian */}
+          {events.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {events.filter(e => ["Goal", "Card"].includes(e.type)).map((e, i) => {
+                const isHomeTeam = e.team?.id === hId;
+                let icon = "•", label = e.detail || e.type;
+                if (e.type === "Goal") { icon = "⚽"; label = e.detail === "Own Goal" ? "Phản lưới nhà" : e.detail === "Penalty" ? "Ghi bàn (phạt đền)" : "Ghi bàn"; }
+                else if (e.type === "Card") { icon = e.detail === "Red Card" ? "🟥" : "🟨"; label = e.detail === "Red Card" ? "Thẻ đỏ" : "Thẻ vàng"; }
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: isHomeTeam ? "flex-start" : "flex-end", textAlign: isHomeTeam ? "left" : "right", fontSize: 13 }}>
+                    {isHomeTeam && <span style={{ minWidth: 34, color: C.gold, fontWeight: 800 }}>{e.time?.elapsed}'</span>}
+                    <span>{icon} <b>{e.player?.name || "—"}</b> <span style={{ color: C.sub }}>({label})</span></span>
+                    {!isHomeTeam && <span style={{ minWidth: 34, color: C.gold, fontWeight: 800 }}>{e.time?.elapsed}'</span>}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: C.dim, marginBottom: 14 }}>Chưa có diễn biến nào (bàn thắng/thẻ).</div>
+          )}
+
+          {/* Thống kê trực tiếp */}
+          {liveStats.length >= 2 && (
+            <div style={{ borderTop: `1px solid #1A2336`, paddingTop: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: C.sub }}>Thống kê hiện tại</div>
+              {[["Kiểm soát bóng", "Ball Possession"], ["Tổng số sút", "Total Shots"], ["Sút trúng đích", "Shots on Goal"], ["Phạt góc", "Corner Kicks"]].map(([lb, ty]) => {
+                const gv = (tid) => { const b = liveStats.find(s => s.team.id === tid); const it = b?.statistics?.find(x => x.type === ty); return it?.value ?? "—"; };
+                return (
+                  <div key={ty} style={{ display: "grid", gridTemplateColumns: "44px 1fr 44px", alignItems: "center", padding: "5px 0", fontSize: 13 }}>
+                    <span style={{ textAlign: "center", fontWeight: 800 }}>{gv(hId)}</span>
+                    <span style={{ textAlign: "center", color: C.sub, fontSize: 12 }}>{lb}</span>
+                    <span style={{ textAlign: "center", fontWeight: 800 }}>{gv(aId)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {err && <div style={{ color: "#FF6B7A", fontSize: 13 }}>{err} <button onClick={load} style={{ marginLeft: 8, color: C.accent, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Thử lại</button></div>}
 
       {done && !loading && stats && (
