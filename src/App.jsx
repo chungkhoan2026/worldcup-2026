@@ -115,7 +115,7 @@ export default function App() {
           <div style={{ fontWeight: 800, fontSize: 20 }}>WORLD CUP 2026</div>
           <div style={{ fontSize: 15, color: C.text }}>Lịch & phân tích · giờ Việt Nam (UTC+7)</div>
           <div style={{ fontSize: 14, color: C.gold, fontWeight: 700 }}>Người viết app: Phạm Anh Khoa</div>
-          <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ</div>
+          <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ, Trường Cò</div>
         </div>
         <button onClick={loadAll} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 12, padding: "12px 16px", cursor: "pointer", fontSize: 24, minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
       </header>
@@ -143,7 +143,7 @@ export default function App() {
       <footer style={{ textAlign: "center", padding: "24px 16px", color: C.sub, fontSize: 12, borderTop: `1px solid ${C.line}`, marginTop: 24 }}>
         Dữ liệu: API-Football · cập nhật trực tuyến mỗi khi mở.
         <div style={{ marginTop: 8, color: C.gold, fontWeight: 800, fontSize: 15 }}>Người viết app: Phạm Anh Khoa</div>
-        <div style={{ marginTop: 4, color: C.text, fontWeight: 600, fontSize: 14 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ</div>
+        <div style={{ marginTop: 4, color: C.text, fontWeight: 600, fontSize: 14 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ, Trường Cò</div>
       </footer>
     </div>
   );
