@@ -803,7 +803,7 @@ function Match({ g, match }) {
           )}
 
           {/* Thống kê trực tiếp */}
-          {liveStats.length >= 2 && (
+          {liveStats.length >= 1 ? (
             <div style={{ borderTop: `1px solid #1A2336`, paddingTop: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: C.sub }}>Thống kê hiện tại</div>
               {[["Kiểm soát bóng", "Ball Possession"], ["Tổng số sút", "Total Shots"], ["Sút trúng đích", "Shots on Goal"], ["Phạt góc", "Corner Kicks"]].map(([lb, ty]) => {
@@ -816,6 +816,10 @@ function Match({ g, match }) {
                   </div>
                 );
               })}
+            </div>
+          ) : (
+            <div style={{ borderTop: `1px solid #1A2336`, paddingTop: 12, fontSize: 13, color: C.dim }}>
+              Đang chờ số liệu thống kê từ nhà cung cấp (thường cập nhật sau khoảng 10-15 phút đầu trận).
             </div>
           )}
         </div>
@@ -854,7 +858,7 @@ function Match({ g, match }) {
         </div>
       )}
 
-      {!done && !loading && (
+      {!done && !loading && !isLive(match) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* So sánh trực quan */}
           {formHome && formAway && v && (
