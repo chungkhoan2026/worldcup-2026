@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 
-/* WORLD CUP 2026 — Lịch & phân tích (giờ Việt Nam) — Người viết app: Phạm Anh Khoa
+/* WORLD CUP 2026 — Lịch & phân tích (giờ Việt Nam) — Người viết app: PAK
    Nguồn: API-Football (league=1, season=2026) qua hàm trung gian /api/football */
 
 const WC_LEAGUE_ID = 1;
@@ -128,7 +128,7 @@ export default function App() {
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: 20 }}>WORLD CUP 2026</div>
           <div style={{ fontSize: 15, color: C.text }}>Lịch & phân tích · giờ Việt Nam (UTC+7)</div>
-          <div style={{ fontSize: 14, color: C.gold, fontWeight: 700 }}>Người viết app: Phạm Anh Khoa</div>
+          <div style={{ fontSize: 14, color: C.gold, fontWeight: 700 }}>Người viết app: PAK</div>
           <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ, Trường Cò</div>
         </div>
         <button onClick={() => loadAll(false)} title="Cập nhật" style={{ background: "none", border: `1px solid ${C.line2}`, color: C.sub, borderRadius: 12, padding: "12px 16px", cursor: "pointer", fontSize: 24, minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
@@ -156,7 +156,7 @@ export default function App() {
 
       <footer style={{ textAlign: "center", padding: "24px 16px", color: C.sub, fontSize: 12, borderTop: `1px solid ${C.line}`, marginTop: 24 }}>
         Dữ liệu: API-Football · cập nhật trực tuyến mỗi khi mở.
-        <div style={{ marginTop: 8, color: C.gold, fontWeight: 800, fontSize: 15 }}>Người viết app: Phạm Anh Khoa</div>
+        <div style={{ marginTop: 8, color: C.gold, fontWeight: 800, fontSize: 15 }}>Người viết app: PAK</div>
         <div style={{ marginTop: 4, color: C.text, fontWeight: 600, fontSize: 14 }}>Cộng tác viên: Nguyễn Viết Lập, Sơn Công Chúa, Minh Nổ, Trường Cò</div>
       </footer>
     </div>
@@ -443,10 +443,11 @@ function Match({ g, match }) {
   const loadLive = useCallback(async () => {
     setLiveLoading(true);
     try {
+      const t = Date.now(); // tham số phá cache: mỗi lần gọi một giá trị khác nhau => luôn lấy số mới nhất
       const [rFix, rEv, rSt] = await Promise.all([
-        fetch(API("fixtures", { id: match.fixture.id })).then(x => x.json()),
-        fetch(API("fixtures/events", { fixture: match.fixture.id })).then(x => x.json()),
-        fetch(API("fixtures/statistics", { fixture: match.fixture.id })).then(x => x.json()),
+        fetch(API("fixtures", { id: match.fixture.id, _t: t })).then(x => x.json()),
+        fetch(API("fixtures/events", { fixture: match.fixture.id, _t: t })).then(x => x.json()),
+        fetch(API("fixtures/statistics", { fixture: match.fixture.id, _t: t })).then(x => x.json()),
       ]);
       const fx = rFix.response?.[0];
       if (fx) {
