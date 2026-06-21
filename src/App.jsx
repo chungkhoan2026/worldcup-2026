@@ -459,7 +459,11 @@ function Match({ g, match }) {
         });
         if (fx.fixture?.referee) setReferee(fx.fixture.referee);
       }
-      setEvents(rEv.response || []);
+      // Diễn biến (events): ưu tiên lấy từ endpoint riêng; nếu rỗng thì lấy trong dữ liệu fixture
+      // (khi gọi live, fixture thường đã kèm sẵn events nên chắc chắn có).
+      const evFromEndpoint = rEv.response || [];
+      const evFromFixture = fx?.events || [];
+      setEvents(evFromEndpoint.length >= evFromFixture.length ? evFromEndpoint : evFromFixture);
       setLiveStats(rSt.response || []);
       setLastUpdate(new Date());
     } catch { /* bỏ qua lỗi tạm thời, lần làm mới sau sẽ thử lại */ }
@@ -858,7 +862,7 @@ function Match({ g, match }) {
         </div>
       )}
 
-      {!done && !loading && !isLive(match) && (
+      {!done && !loading && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* So sánh trực quan */}
           {formHome && formAway && v && (
