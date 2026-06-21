@@ -462,10 +462,11 @@ function Match({ g, match }) {
         });
         if (fx.fixture?.referee) setReferee(fx.fixture.referee);
       }
-      // Diễn biến: lấy nguồn nào nhiều sự kiện hơn (endpoint riêng vs kèm trong fixture)
+      // Diễn biến: ưu tiên endpoint events RIÊNG (chắc chắn đầy đủ nhất);
+      // nếu vì lý do nào đó rỗng thì mới lấy từ trong fixture của live=all.
       const evFromEndpoint = rEv.response || [];
       const evFromFixture = fx?.events || [];
-      setEvents(evFromFixture.length >= evFromEndpoint.length ? evFromFixture : evFromEndpoint);
+      setEvents(evFromEndpoint.length > 0 ? evFromEndpoint : evFromFixture);
       setLiveStats(rSt.response || []);
       setLastUpdate(new Date());
     } catch { /* bỏ qua lỗi tạm thời, lần làm mới sau sẽ thử lại */ }
@@ -787,14 +788,18 @@ function Match({ g, match }) {
             </div>
           )}
 
-          {/* Diễn biến: bàn thắng, thẻ vàng/đỏ theo thứ tự thời gian */}
-          {events.length > 0 ? (
+          {/* Diễn biến: bàn thắng, thẻ, VAR, thay người theo thứ tự thời gian */}
+          {(() => {
+            const shown = events.filter(e => ["Goal", "Card", "Var", "subst"].includes(e.type));
+            return shown.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-              {events.filter(e => ["Goal", "Card"].includes(e.type)).map((e, i) => {
+              {shown.map((e, i) => {
                 const isHomeTeam = e.team?.id === hId;
                 let icon = "•", label = e.detail || e.type;
                 if (e.type === "Goal") { icon = "⚽"; label = e.detail === "Own Goal" ? "Phản lưới nhà" : e.detail === "Penalty" ? "Ghi bàn (phạt đền)" : "Ghi bàn"; }
                 else if (e.type === "Card") { icon = e.detail === "Red Card" ? "🟥" : "🟨"; label = e.detail === "Red Card" ? "Thẻ đỏ" : "Thẻ vàng"; }
+                else if (e.type === "Var") { icon = "📺"; label = (e.detail || "").includes("Disallowed") ? "Bàn thắng bị từ chối (VAR)" : "VAR: " + (e.detail || ""); }
+                else if (e.type === "subst") { icon = "🔄"; label = "Thay người"; }
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: isHomeTeam ? "flex-start" : "flex-end", textAlign: isHomeTeam ? "left" : "right", fontSize: 13 }}>
                     {isHomeTeam && <span style={{ minWidth: 34, color: C.gold, fontWeight: 800 }}>{e.time?.elapsed}'</span>}
@@ -806,7 +811,8 @@ function Match({ g, match }) {
             </div>
           ) : (
             <div style={{ fontSize: 13, color: C.dim, marginBottom: 14 }}>Chưa có diễn biến nào (bàn thắng/thẻ).</div>
-          )}
+          );
+          })()}
 
           {/* Thống kê trực tiếp */}
           {liveStats.length >= 1 ? (
