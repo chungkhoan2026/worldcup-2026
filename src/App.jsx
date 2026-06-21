@@ -103,9 +103,16 @@ export default function App() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Tự động làm mới ngầm danh sách bảng mỗi 30 phút (không làm gián đoạn người đang xem)
+  // Tự động làm mới ngầm danh sách bảng theo KHUNG GIỜ (giờ VN):
+  // - Từ 22h tối đến 12h trưa hôm sau: làm mới mỗi 15 phút (khung giờ World Cup hay đá).
+  // - Ngoài khung đó: không tự làm mới, để người dùng tự bấm nút ↻.
   useEffect(() => {
-    const timer = setInterval(() => loadAll(true), 30 * 60 * 1000);
+    const inRefreshWindow = () => {
+      const vnHour = new Date(Date.now() + 7 * 3600 * 1000).getUTCHours(); // giờ hiện tại theo VN (0-23)
+      return vnHour >= 22 || vnHour < 12; // 22h,23h,0h...11h => true
+    };
+    const tick = () => { if (inRefreshWindow()) loadAll(true); };
+    const timer = setInterval(tick, 15 * 60 * 1000); // kiểm tra & làm mới mỗi 15 phút
     return () => clearInterval(timer);
   }, [loadAll]);
 
@@ -293,6 +300,9 @@ function Match({ g, match }) {
   const [liveStats, setLiveStats] = useState([]); // thống kê hiện tại
   const [liveLoading, setLiveLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [lineups, setLineups] = useState(null);     // đội hình ra sân
+  const [lineupLoading, setLineupLoading] = useState(false);
+  const [lineupErr, setLineupErr] = useState("");
   const done = isDone(match);
   const t = toVN(match.fixture.date);
   const hId = match.teams.home.id, aId = match.teams.away.id;
@@ -455,11 +465,34 @@ function Match({ g, match }) {
     finally { setLiveLoading(false); }
   }, [match.fixture.id]);
 
+  // Tự động tải đội hình khi trận đang đá hoặc sắp đá trong ~3 giờ tới (lúc đội hình thường đã công bố).
+  // Trận còn xa thì không tải vì API chưa có dữ liệu.
+  useEffect(() => {
+    const ms = new Date(match.fixture.date).getTime() - Date.now();
+    const soonOrLive = isLive(match) || done || (ms <= 3 * 3600 * 1000 && ms > -4 * 3600 * 1000);
+    if (soonOrLive && !lineups && !lineupLoading) loadLineups();
+  }, [match, done, lineups, lineupLoading, loadLineups]);
+
+  // Tải danh sách cầu thủ ra sân (đội hình). Người dùng bấm nút mới tải, để tiết kiệm lượt API.
+  const loadLineups = useCallback(async () => {
+    setLineupLoading(true); setLineupErr("");
+    try {
+      const r = await fetch(API("fixtures/lineups", { fixture: match.fixture.id }));
+      const j = await r.json();
+      if (j.errors && (Array.isArray(j.errors) ? j.errors.length : Object.keys(j.errors).length)) {
+        throw new Error(typeof j.errors === "object" ? Object.values(j.errors).join("; ") : String(j.errors));
+      }
+      setLineups(j.response || []);
+    } catch (e) {
+      setLineupErr("Chưa tải được đội hình. " + e.message);
+    } finally { setLineupLoading(false); }
+  }, [match.fixture.id]);
+
   // Khi trận đang đá: tải ngay + tự động làm mới mỗi 45 giây. Ngừng khi rời trang hoặc trận kết thúc.
   useEffect(() => {
     if (!isLive(match)) return;
     loadLive();
-    const timer = setInterval(loadLive, 60000);
+    const timer = setInterval(loadLive, 30000);
     return () => clearInterval(timer);
   }, [match, loadLive]);
 
@@ -684,6 +717,52 @@ function Match({ g, match }) {
           : !done && <div style={{ textAlign: "center", fontSize: 12, color: C.dim, marginTop: 6 }}>🧑‍⚖️ Trọng tài: chưa công bố</div>}
       </div>
 
+      <div style={{ marginBottom: 16 }}>
+        {lineupLoading && !lineups && (
+          <div style={{ fontSize: 13, color: C.sub, textAlign: "center", padding: 12 }}>Đang tải đội hình ra sân…</div>
+        )}
+        {lineupErr && <div style={{ fontSize: 13, color: "#FF6B7A", marginTop: 8, textAlign: "center" }}>{lineupErr}</div>}
+        {lineups && lineups.length === 0 && (
+          <div style={{ fontSize: 13, color: C.sub, textAlign: "center", padding: 12, background: C.card, borderRadius: 12, border: `1px solid ${C.line}` }}>
+            Đội hình ra sân thường được công bố khoảng 1 giờ trước trận. Vui lòng quay lại gần giờ thi đấu.
+          </div>
+        )}
+        {lineups && lineups.length > 0 && (
+          <div>
+            <div style={{ fontWeight: 800, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>👥 Đội hình ra sân</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {lineups.map((lu) => (
+              <div key={lu.team.id} style={{ background: C.card, border: `1px solid ${C.line2}`, borderRadius: 12, padding: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                  {lu.team.logo && <img src={lu.team.logo} alt="" style={{ width: 22, height: 22 }} />}
+                  <span style={{ fontWeight: 800, fontSize: 14 }}>{lu.team.name}</span>
+                </div>
+                {lu.formation && <div style={{ fontSize: 12, color: C.gold, marginBottom: 8 }}>Sơ đồ: {lu.formation}</div>}
+                <div style={{ fontSize: 12, color: C.sub, fontWeight: 700, marginBottom: 4 }}>Đội hình chính</div>
+                {(lu.startXI || []).map((p) => (
+                  <div key={p.player.id} style={{ fontSize: 13, color: C.text, padding: "2px 0", display: "flex", gap: 6 }}>
+                    <span style={{ color: C.gold, minWidth: 22, fontWeight: 700 }}>{p.player.number ?? "—"}</span>
+                    <span>{p.player.name}</span>
+                  </div>
+                ))}
+                {lu.substitutes && lu.substitutes.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 12, color: C.sub, fontWeight: 700, margin: "8px 0 4px" }}>Dự bị</div>
+                    {lu.substitutes.map((p) => (
+                      <div key={p.player.id} style={{ fontSize: 12, color: C.dim, padding: "1px 0", display: "flex", gap: 6 }}>
+                        <span style={{ minWidth: 22 }}>{p.player.number ?? "—"}</span>
+                        <span>{p.player.name}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          </div>
+        )}
+      </div>
+
       {isLive(match) && (
         <div style={{ background: C.card, border: `1px solid ${C.accent}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -697,7 +776,7 @@ function Match({ g, match }) {
 
           {lastUpdate && (
             <div style={{ fontSize: 11, color: C.dim, marginBottom: 12 }}>
-              Tự động làm mới mỗi 60 giây · Cập nhật lúc {toVN(lastUpdate.toISOString()).time}
+              Tự động làm mới mỗi 30 giây · Cập nhật lúc {toVN(lastUpdate.toISOString()).time}
             </div>
           )}
 
