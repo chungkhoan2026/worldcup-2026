@@ -444,12 +444,15 @@ function Match({ g, match }) {
     setLiveLoading(true);
     try {
       const t = Date.now(); // tham số phá cache: mỗi lần gọi một giá trị khác nhau => luôn lấy số mới nhất
-      const [rFix, rEv, rSt] = await Promise.all([
-        fetch(API("fixtures", { id: match.fixture.id, _t: t })).then(x => x.json()),
+      // Gọi "live=all" của giải: API trả về fixture KÈM events đầy đủ nhất (bàn thắng, thẻ...).
+      // Đồng thời gọi events riêng + thống kê để dự phòng và bổ sung.
+      const [rLive, rEv, rSt] = await Promise.all([
+        fetch(API("fixtures", { league: WC_LEAGUE_ID, season: SEASON, live: "all", _t: t })).then(x => x.json()),
         fetch(API("fixtures/events", { fixture: match.fixture.id, _t: t })).then(x => x.json()),
         fetch(API("fixtures/statistics", { fixture: match.fixture.id, _t: t })).then(x => x.json()),
       ]);
-      const fx = rFix.response?.[0];
+      // Tìm đúng trận này trong danh sách các trận đang đá
+      const fx = (rLive.response || []).find(f => f.fixture?.id === match.fixture.id);
       if (fx) {
         setLive({
           status: fx.fixture?.status?.short,
@@ -459,11 +462,10 @@ function Match({ g, match }) {
         });
         if (fx.fixture?.referee) setReferee(fx.fixture.referee);
       }
-      // Diễn biến (events): ưu tiên lấy từ endpoint riêng; nếu rỗng thì lấy trong dữ liệu fixture
-      // (khi gọi live, fixture thường đã kèm sẵn events nên chắc chắn có).
+      // Diễn biến: lấy nguồn nào nhiều sự kiện hơn (endpoint riêng vs kèm trong fixture)
       const evFromEndpoint = rEv.response || [];
       const evFromFixture = fx?.events || [];
-      setEvents(evFromEndpoint.length >= evFromFixture.length ? evFromEndpoint : evFromFixture);
+      setEvents(evFromFixture.length >= evFromEndpoint.length ? evFromFixture : evFromEndpoint);
       setLiveStats(rSt.response || []);
       setLastUpdate(new Date());
     } catch { /* bỏ qua lỗi tạm thời, lần làm mới sau sẽ thử lại */ }
