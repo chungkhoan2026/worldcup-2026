@@ -697,7 +697,7 @@ function Match({ g, match }) {
   const rev = done ? review() : null;
 
   return (
-    <div>
+    <div style={{ zoom: 1.25 }}>
       <div style={{ background: "linear-gradient(135deg,#15203A,#101727)", border: `1px solid ${isLive(match) ? C.accent : C.line2}`, borderRadius: 16, padding: "20px 16px", marginBottom: 16 }}>
         <div style={{ textAlign: "center", fontSize: 14, color: C.text, fontWeight: 600, marginBottom: 8 }}>Bảng {g} · {t.date}/2026 · {t.time} (giờ VN)</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
