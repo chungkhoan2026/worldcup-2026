@@ -465,15 +465,7 @@ function Match({ g, match }) {
     finally { setLiveLoading(false); }
   }, [match.fixture.id]);
 
-  // Tự động tải đội hình khi trận đang đá hoặc sắp đá trong ~3 giờ tới (lúc đội hình thường đã công bố).
-  // Trận còn xa thì không tải vì API chưa có dữ liệu.
-  useEffect(() => {
-    const ms = new Date(match.fixture.date).getTime() - Date.now();
-    const soonOrLive = isLive(match) || done || (ms <= 3 * 3600 * 1000 && ms > -4 * 3600 * 1000);
-    if (soonOrLive && !lineups && !lineupLoading) loadLineups();
-  }, [match, done, lineups, lineupLoading, loadLineups]);
-
-  // Tải danh sách cầu thủ ra sân (đội hình). Người dùng bấm nút mới tải, để tiết kiệm lượt API.
+  // Tải danh sách cầu thủ ra sân (đội hình).
   const loadLineups = useCallback(async () => {
     setLineupLoading(true); setLineupErr("");
     try {
@@ -487,6 +479,14 @@ function Match({ g, match }) {
       setLineupErr("Chưa tải được đội hình. " + e.message);
     } finally { setLineupLoading(false); }
   }, [match.fixture.id]);
+
+  // Tự động tải đội hình khi trận đang đá / đã đá / sắp đá trong ~3 giờ tới.
+  // Trận còn xa thì không tải vì API chưa có dữ liệu. Đặt SAU khi loadLineups đã khai báo.
+  useEffect(() => {
+    const ms = new Date(match.fixture.date).getTime() - Date.now();
+    const soonOrLive = isLive(match) || done || (ms <= 3 * 3600 * 1000 && ms > -4 * 3600 * 1000);
+    if (soonOrLive && !lineups && !lineupLoading) loadLineups();
+  }, [match, done, lineups, lineupLoading, loadLineups]);
 
   // Khi trận đang đá: tải ngay + tự động làm mới mỗi 45 giây. Ngừng khi rời trang hoặc trận kết thúc.
   useEffect(() => {
