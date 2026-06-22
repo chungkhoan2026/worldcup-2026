@@ -714,9 +714,19 @@ function Match({ g, match }) {
             <span className="live-banner" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(230,57,70,.18)", border: `1px solid ${C.accent}`, borderRadius: 999, padding: "4px 14px" }}>
               <span className="live-dot" />
               <span style={{ fontWeight: 800, fontSize: 13, color: "#FF6B7A" }}>
-                {liveStatLabel[live?.status] || "ĐANG ĐÁ"}{live?.elapsed != null ? ` · phút ${live.elapsed}'` : ""}
+                {liveStatLabel[live?.status] || "ĐANG ĐÁ"}
               </span>
             </span>
+            {/* Đồng hồ số: hiển thị phút thi đấu hiện tại, cập nhật theo dữ liệu live */}
+            {live?.elapsed != null && (
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
+                <div style={{ display: "inline-flex", alignItems: "baseline", gap: 4, background: "#0A0E18", border: `2px solid ${C.accent}`, borderRadius: 12, padding: "8px 18px", boxShadow: "0 0 16px rgba(230,57,70,.35)" }}>
+                  <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 34, color: "#FF6B7A", lineHeight: 1, letterSpacing: 1 }}>{String(live.elapsed).padStart(2, "0")}</span>
+                  <span style={{ fontWeight: 800, fontSize: 18, color: C.gold }}>'</span>
+                  {live.status === "HT" && <span style={{ fontSize: 12, color: C.sub, marginLeft: 4 }}>nghỉ</span>}
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div style={{ textAlign: "center", fontSize: 13, color: C.sub, marginTop: 12 }}>📍 {match.fixture.venue?.name || "—"}</div>
@@ -785,6 +795,24 @@ function Match({ g, match }) {
           {lastUpdate && (
             <div style={{ fontSize: 11, color: C.dim, marginBottom: 12 }}>
               Tự động làm mới mỗi 30 giây · Cập nhật lúc {toVN(lastUpdate.toISOString()).time}
+            </div>
+          )}
+
+          {/* Tỉ số trực tiếp ngay trong khung tổng hợp, khỏi kéo lên đầu trang */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, background: "rgba(230,57,70,.10)", border: `1px solid ${C.line2}`, borderRadius: 12, padding: "10px 14px", marginBottom: 14 }}>
+            <span style={{ flex: 1, textAlign: "right", fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+              {match.teams.home.name} <img src={match.teams.home.logo} width={22} height={22} alt="" />
+            </span>
+            <span style={{ fontWeight: 900, fontSize: 26, color: "#FF6B7A", minWidth: 60, textAlign: "center" }}>
+              {(live?.gh ?? match.goals.home ?? 0)} - {(live?.ga ?? match.goals.away ?? 0)}
+            </span>
+            <span style={{ flex: 1, textAlign: "left", fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+              <img src={match.teams.away.logo} width={22} height={22} alt="" /> {match.teams.away.name}
+            </span>
+          </div>
+          {live?.elapsed != null && (
+            <div style={{ textAlign: "center", fontSize: 12, color: C.gold, fontWeight: 700, marginTop: -6, marginBottom: 14 }}>
+              ⏱ {liveStatLabel[live?.status] || "Đang đá"} · phút {live.elapsed}'
             </div>
           )}
 
@@ -1039,6 +1067,25 @@ function Match({ g, match }) {
                   <div style={{ fontSize: 14, lineHeight: 1.7, color: "#E7ECF3" }}>{v.advice}</div>
                 </div>
               )}
+
+              {/* Dự đoán phạt góc — tính từ trung bình phạt góc/trận thật của 2 đội */}
+              {(styleHome?.corners != null || styleAway?.corners != null) && (() => {
+                const cH = styleHome?.corners ?? 5;   // mặc định 5 nếu thiếu dữ liệu 1 đội
+                const cA = styleAway?.corners ?? 5;
+                const totalCorners = Math.round(cH + cA);
+                // Khoảng 2 số liền nhau quanh giá trị trung bình (vd 10 => 10–11)
+                const low = totalCorners, high = totalCorners + 1;
+                return (
+                  <div style={{ background: "rgba(74,222,128,.08)", border: `1px solid ${C.green}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.green, marginBottom: 6 }}>🚩 Dự đoán phạt góc</div>
+                    <div style={{ fontSize: 14, lineHeight: 1.7, color: "#E7ECF3" }}>
+                      Tổng phạt góc dự kiến cả trận: <b style={{ color: C.gold }}>khoảng {low}–{high} quả</b> (trung bình ~{totalCorners}).
+                      {styleHome?.corners != null && <><br />{match.teams.home.name}: ~{cH.toFixed(1)} quả/trận.</>}
+                      {styleAway?.corners != null && <><br />{match.teams.away.name}: ~{cA.toFixed(1)} quả/trận.</>}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div style={{ fontSize: 11, color: C.dim, marginTop: 4, textAlign: "center" }}>Nhận định tự động dựa trên dữ liệu phong độ thật từ API-Football, mang tính tham khảo.</div>
             </div>
