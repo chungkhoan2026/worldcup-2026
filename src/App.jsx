@@ -73,6 +73,7 @@ const C = { bg: "#0B1120", card: "#121A2B", line: "#1E293B", line2: "#243049", t
 export default function App() {
   const [view, setView] = useState({ name: "groups" });
   const [groups, setGroups] = useState(null);
+  const [knockout, setKnockout] = useState(null); // các trận vòng loại trực tiếp, gom theo vòng
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -87,15 +88,22 @@ export default function App() {
       }
       const fixtures = json.response || [];
       const map = {};
+      const ko = {}; // { "Round of 32": [...], "Round of 16": [...], ... }
       for (const f of fixtures) {
-        // Chỉ lấy vòng bảng (Group Stage); bỏ qua knock-out
-        const round = (f.league?.round || "").toLowerCase();
-        if (!round.includes("group")) continue;
-        const g = groupOfTeam(f.teams?.home?.name) || groupOfTeam(f.teams?.away?.name);
-        if (!g) continue;
-        (map[g] ||= []).push(f);
+        const round = (f.league?.round || "");
+        const roundLow = round.toLowerCase();
+        if (roundLow.includes("group")) {
+          // Vòng bảng
+          const g = groupOfTeam(f.teams?.home?.name) || groupOfTeam(f.teams?.away?.name);
+          if (!g) continue;
+          (map[g] ||= []).push(f);
+        } else {
+          // Vòng loại trực tiếp (Round of 32/16, Quarter/Semi-finals, 3rd Place, Final...)
+          (ko[round] ||= []).push(f);
+        }
       }
       setGroups(map);
+      setKnockout(ko);
     } catch (e) {
       if (!silent) setError("Không tải được dữ liệu. " + e.message);
     } finally { if (!silent) setLoading(false); }
@@ -122,7 +130,7 @@ export default function App() {
 
       <header style={{ borderBottom: `1px solid ${C.line}`, padding: "16px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "rgba(11,17,32,.92)", backdropFilter: "blur(8px)", zIndex: 10 }}>
         {view.name !== "groups" && (
-          <button onClick={() => setView(view.name === "match" ? { name: "group", g: view.g } : { name: "groups" })} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", fontSize: 48, lineHeight: 1, padding: "4px 12px", minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+          <button onClick={() => setView(view.name === "match" ? (view.g === "KO" ? { name: "knockout" } : { name: "group", g: view.g }) : { name: "groups" })} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", fontSize: 48, lineHeight: 1, padding: "4px 12px", minWidth: 56, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
         )}
         <span style={{ fontSize: 28 }}>🏆</span>
         <div style={{ flex: 1 }}>
@@ -147,7 +155,14 @@ export default function App() {
         )}
         {!loading && !error && groups && Object.keys(groups).length > 0 && (
           <>
+            {(view.name === "groups" || view.name === "knockout") && (
+              <div style={{ display: "flex", gap: 10, marginBottom: 20, justifyContent: "center" }}>
+                <button onClick={() => setView({ name: "groups" })} style={{ flex: "0 1 220px", padding: "12px 16px", borderRadius: 12, fontWeight: 800, fontSize: 15, cursor: "pointer", border: `1px solid ${view.name === "groups" ? C.accent : C.line2}`, background: view.name === "groups" ? "rgba(230,57,70,.15)" : C.card, color: view.name === "groups" ? "#FF6B7A" : C.sub }}>📋 Vòng bảng</button>
+                <button onClick={() => setView({ name: "knockout" })} style={{ flex: "0 1 220px", padding: "12px 16px", borderRadius: 12, fontWeight: 800, fontSize: 15, cursor: "pointer", border: `1px solid ${view.name === "knockout" ? C.accent : C.line2}`, background: view.name === "knockout" ? "rgba(230,57,70,.15)" : C.card, color: view.name === "knockout" ? "#FF6B7A" : C.sub }}>🏆 Vòng loại trực tiếp</button>
+              </div>
+            )}
             {view.name === "groups" && <Groups groups={groups} onOpen={(g) => setView({ name: "group", g })} />}
+            {view.name === "knockout" && <Knockout knockout={knockout} onOpenMatch={(m) => setView({ name: "match", g: "KO", match: m })} />}
             {view.name === "group" && <Group g={view.g} fixtures={groups[view.g] || []} onOpenMatch={(m) => setView({ name: "match", g: view.g, match: m })} />}
             {view.name === "match" && <Match g={view.g} match={view.match} />}
           </>
@@ -240,6 +255,167 @@ function Groups({ groups, onOpen }) {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// Thứ tự và tên tiếng Việt các vòng loại trực tiếp
+const KO_ORDER = [
+  { match: ["round of 32", "1/16"], vi: "Vòng 1/16" },
+  { match: ["round of 16", "1/8"], vi: "Vòng 1/8" },
+  { match: ["quarter"], vi: "Tứ kết" },
+  { match: ["semi"], vi: "Bán kết" },
+  { match: ["3rd place", "third place", "play-off for third"], vi: "Tranh hạng ba" },
+  { match: ["final"], vi: "Chung kết" },
+];
+function koViName(round) {
+  const low = (round || "").toLowerCase();
+  // "final" phải kiểm sau "semi-final"/"quarter-final" để không nhầm
+  if (low.includes("semi")) return "Bán kết";
+  if (low.includes("quarter")) return "Tứ kết";
+  if (low.includes("round of 32") || low.includes("1/16")) return "Vòng 1/16";
+  if (low.includes("round of 16") || low.includes("1/8")) return "Vòng 1/8";
+  if (low.includes("3rd") || low.includes("third")) return "Tranh hạng ba";
+  if (low.includes("final")) return "Chung kết";
+  return round;
+}
+function koRank(round) {
+  const vi = koViName(round);
+  const order = ["Vòng 1/16", "Vòng 1/8", "Tứ kết", "Bán kết", "Tranh hạng ba", "Chung kết"];
+  const i = order.indexOf(vi);
+  return i === -1 ? 99 : i;
+}
+
+function Knockout({ knockout, onOpenMatch }) {
+  const rounds = knockout ? Object.keys(knockout) : [];
+  // Sắp xếp các vòng theo thứ tự thi đấu
+  const sortedRounds = [...rounds].sort((a, b) => koRank(a) - koRank(b));
+  const hasAny = sortedRounds.length > 0;
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 28, fontWeight: 800, margin: "4px 0 16px" }}><span style={{ color: C.accent }}>🏆 Vòng loại trực tiếp</span></h2>
+
+      {!hasAny && (
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 20, textAlign: "center", color: C.sub, fontSize: 14, lineHeight: 1.7 }}>
+          Các cặp đấu vòng loại trực tiếp sẽ xuất hiện sau khi vòng bảng kết thúc (khoảng 27/6/2026).<br />
+          Lúc đó, 32 đội (gồm nhì bảng, nhất bảng và 8 đội hạng ba xuất sắc nhất) sẽ được ghép cặp tự động.
+        </div>
+      )}
+
+      {sortedRounds.map((round) => {
+        const matches = [...knockout[round]].sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+        return (
+          <div key={round} style={{ marginBottom: 24 }}>
+            <div style={{ fontWeight: 800, fontSize: 18, color: C.gold, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              {koViName(round)} <span style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>({matches.length} trận)</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
+              {matches.map((m) => {
+                const t = toVN(m.fixture.date); const done = isDone(m); const live = isLive(m);
+                const sc = `${m.goals.home ?? "-"}-${m.goals.away ?? "-"}`;
+                const tbd = !m.teams.home.name || !m.teams.away.name || m.teams.home.name === "TBD" || m.teams.away.name === "TBD";
+                return (
+                  <button key={m.fixture.id} onClick={() => onOpenMatch(m)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${live ? C.accent : C.line}`, borderRadius: 14, padding: 14, color: "inherit" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>📅 {t.date} &nbsp;🕒 {t.time}</span>
+                      {live ? <span className="pill" style={{ background: "rgba(230,57,70,.2)", color: "#FF6B7A" }}>ĐANG ĐÁ</span>
+                        : done ? <span className="pill" style={{ background: "rgba(34,197,94,.15)", color: C.green }}>ĐÃ ĐÁ</span>
+                        : <span className="pill" style={{ background: "rgba(230,57,70,.15)", color: "#FF6B7A" }}>CHƯA ĐÁ</span>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ flex: 1, textAlign: "right", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>{m.teams.home.name || "Chưa xác định"} {m.teams.home.logo && <img src={m.teams.home.logo} width={22} height={22} alt="" />}</span>
+                      <span style={{ minWidth: 50, textAlign: "center", fontWeight: 800, color: done ? C.gold : C.dim }}>{done ? sc : "vs"}</span>
+                      <span style={{ flex: 1, textAlign: "left", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>{m.teams.away.logo && <img src={m.teams.away.logo} width={22} height={22} alt="" />} {m.teams.away.name || "Chưa xác định"}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>📍 {m.fixture.venue?.name || "—"}{m.fixture.venue?.city ? `, ${m.fixture.venue.city}` : ""}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      <QualifiedTeams />
+    </div>
+  );
+}
+
+// Mục "Đội đã/đang giành vé": lấy bảng xếp hạng 12 bảng, hiện top 2 mỗi bảng + danh sách hạng ba
+function QualifiedTeams() {
+  const [standings, setStandings] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = async () => {
+    setLoading(true); setErr("");
+    try {
+      const r = await fetch(API("standings", { league: WC_LEAGUE_ID, season: SEASON }));
+      const j = await r.json();
+      if (j.errors && (Array.isArray(j.errors) ? j.errors.length : Object.keys(j.errors).length)) {
+        throw new Error(typeof j.errors === "object" ? Object.values(j.errors).join("; ") : String(j.errors));
+      }
+      // standings: response[0].league.standings là mảng các bảng
+      const sd = j.response?.[0]?.league?.standings || [];
+      setStandings(sd);
+    } catch (e) { setErr("Chưa tải được bảng xếp hạng. " + e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <span style={{ fontWeight: 800, fontSize: 18, color: C.green }}>✅ Đội đang giành vé đi tiếp</span>
+        {!standings && <button onClick={load} disabled={loading} style={{ background: loading ? C.line : C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 12px", cursor: loading ? "default" : "pointer", fontWeight: 700, fontSize: 13 }}>{loading ? "Đang tải…" : "Xem"}</button>}
+      </div>
+      {err && <div style={{ fontSize: 13, color: "#FF6B7A" }}>{err}</div>}
+      {!standings && !err && <div style={{ fontSize: 13, color: C.sub }}>Bấm "Xem" để tải bảng xếp hạng hiện tại của 12 bảng (top 2 mỗi bảng đi tiếp, cùng 8 đội hạng ba xuất sắc nhất).</div>}
+      {standings && (() => {
+        // Mỗi phần tử trong standings là 1 bảng (mảng các đội đã xếp hạng)
+        const groups = standings.filter(g => Array.isArray(g) && g.length);
+        const thirds = []; // gom các đội hạng ba để so sánh
+        return (
+          <div>
+            <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>Top 2 mỗi bảng đi thẳng. 8 đội hạng ba xuất sắc nhất (trong 12 đội hạng ba) cũng đi tiếp.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 16 }}>
+              {groups.map((tbl, gi) => {
+                const groupName = tbl[0]?.group || `Bảng ${gi + 1}`;
+                if (tbl[2]) thirds.push({ ...tbl[2], groupName });
+                return (
+                  <div key={gi} style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.accent, marginBottom: 6 }}>{groupName}</div>
+                    {tbl.map((row, ri) => (
+                      <div key={ri} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "3px 0", color: ri < 2 ? C.green : ri === 2 ? C.gold : C.sub, fontWeight: ri < 2 ? 700 : 500 }}>
+                        <span style={{ minWidth: 16 }}>{ri + 1}.</span>
+                        {row.team?.logo && <img src={row.team.logo} width={18} height={18} alt="" />}
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.team?.name}</span>
+                        <span style={{ fontWeight: 700 }}>{row.points}đ</span>
+                        {ri < 2 && <span style={{ fontSize: 10 }}>✅</span>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+            {thirds.length > 0 && (
+              <div style={{ borderTop: `1px solid #1A2336`, paddingTop: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: C.gold, marginBottom: 8 }}>Các đội hạng ba (xếp theo điểm, hiệu số) — 8 đội đầu đi tiếp:</div>
+                {thirds.sort((a, b) => (b.points - a.points) || (b.goalsDiff - a.goalsDiff)).map((tm, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "4px 0", color: i < 8 ? C.green : C.sub, fontWeight: i < 8 ? 700 : 500 }}>
+                    <span style={{ minWidth: 20 }}>{i + 1}.</span>
+                    {tm.team?.logo && <img src={tm.team.logo} width={18} height={18} alt="" />}
+                    <span style={{ flex: 1 }}>{tm.team?.name} <span style={{ color: C.dim, fontSize: 11 }}>({tm.groupName})</span></span>
+                    <span>{tm.points}đ · HS {tm.goalsDiff > 0 ? "+" : ""}{tm.goalsDiff}</span>
+                    {i < 8 && <span style={{ fontSize: 10 }}>✅</span>}
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>Lưu ý: thứ hạng còn thay đổi cho tới khi tất cả các bảng đá xong. Đây là ảnh chụp hiện tại, mang tính tham khảo.</div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
