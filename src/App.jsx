@@ -255,8 +255,13 @@ function Groups({ groups, onOpen }) {
         const teams = teamsOf(groups[id]);
         const done = groups[id].filter(isDone).length;
         // Các trận của bảng này diễn ra hôm nay (theo giờ VN), chưa đá xong, sắp theo giờ
+        // Trận ĐANG đá (live) — ưu tiên cao nhất, màu đỏ
+        const liveMatches = groups[id]
+          .filter((m) => isLive(m))
+          .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+        // Trận hôm nay nhưng CHƯA đá (không gồm trận đang đá) — màu cam
         const todayMatches = groups[id]
-          .filter((m) => isToday(m.fixture?.date) && !isDone(m))
+          .filter((m) => isToday(m.fixture?.date) && !isDone(m) && !isLive(m))
           .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
         // Các trận sắp đá trong 24h tới (không tính hôm nay)
         const soonMatches = groups[id]
@@ -267,11 +272,25 @@ function Groups({ groups, onOpen }) {
           .filter((m) => isDone(m))
           .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
         return (
-          <button key={id} onClick={() => onOpen(id)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
+          <button key={id} onClick={() => onOpen(id)} className={liveMatches.length > 0 ? "card live-banner" : "card"} style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${liveMatches.length > 0 ? C.accent : C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
               <span style={{ fontWeight: 800, fontSize: 18, color: C.accent }}>Bảng {id}</span>
               <span className="pill" style={{ background: C.line, color: "#9FB0C9" }}>{done}/{groups[id].length} đã đá</span>
             </div>
+            {liveMatches.length > 0 && (
+              <div className="live-banner" style={{ background: "rgba(230,57,70,.14)", border: `1px solid ${C.accent}`, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                  <span className="live-dot" />
+                  <span style={{ fontWeight: 800, fontSize: 13, color: "#FF6B7A", letterSpacing: ".5px" }}>ĐANG ĐÁ</span>
+                </div>
+                {liveMatches.map((m) => (
+                  <div key={m.fixture.id} style={{ fontSize: 13, color: C.text, fontWeight: 600, padding: "2px 0" }}>
+                    {m.teams.home.name} <span style={{ color: C.sub }}>vs</span> {m.teams.away.name}
+                    <LiveMini match={m} />
+                  </div>
+                ))}
+              </div>
+            )}
             {todayMatches.length > 0 && (
               <div style={{ background: "rgba(255,140,66,.12)", border: `1px solid #FF8C42`, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: todayMatches.length ? 6 : 0 }}>
@@ -283,7 +302,6 @@ function Groups({ groups, onOpen }) {
                   return (
                     <div key={m.fixture.id} style={{ fontSize: 13, color: C.text, fontWeight: 600, padding: "2px 0" }}>
                       🕒 <b style={{ color: C.gold }}>{tt.time}</b> · {m.teams.home.name} <span style={{ color: C.sub }}>vs</span> {m.teams.away.name}
-                      {isLive(m) && <LiveMini match={m} />}
                     </div>
                   );
                 })}
