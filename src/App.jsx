@@ -194,6 +194,59 @@ function isDone(m) { return ["FT", "AET", "PEN"].includes(m.fixture?.status?.sho
 // Trận đang diễn ra (bao gồm hiệp 1, nghỉ giữa hiệp, hiệp 2, hiệp phụ, loạt luân lưu)
 function isLive(m) { return ["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"].includes(m.fixture?.status?.short); }
 
+// Hiển thị nhanh tỉ số + phạt góc + thẻ vàng cho 1 trận đang đá, ngay trong thẻ bảng.
+// Tự tải thống kê + sự kiện; tự làm mới mỗi 60 giây (nhẹ hơn khu chi tiết để tiết kiệm lượt API).
+function LiveMini({ match }) {
+  const [data, setData] = useState(null);
+  const hId = match.teams.home.id, aId = match.teams.away.id;
+  const koLabel = { "1H": "Hiệp 1", "HT": "Nghỉ", "2H": "Hiệp 2", "ET": "Hiệp phụ", "BT": "Nghỉ HP", "P": "Luân lưu", "INT": "Tạm dừng" };
+
+  useEffect(() => {
+    let alive = true;
+    const fetchData = async () => {
+      try {
+        const t = Date.now();
+        const [rSt, rEv, rFx] = await Promise.all([
+          fetch(API("fixtures/statistics", { fixture: match.fixture.id, _t: t })).then(x => x.json()),
+          fetch(API("fixtures/events", { fixture: match.fixture.id, _t: t })).then(x => x.json()),
+          fetch(API("fixtures", { id: match.fixture.id, _t: t })).then(x => x.json()),
+        ]);
+        if (!alive) return;
+        const stats = rSt.response || [];
+        const events = rEv.response || [];
+        const fx = rFx.response?.[0];
+        const corner = (tid) => { const b = stats.find(s => s.team.id === tid); const it = b?.statistics?.find(x => x.type === "Corner Kicks"); return it?.value ?? "—"; };
+        const yellow = (tid) => events.filter(e => e.type === "Card" && e.detail === "Yellow Card" && e.team?.id === tid).length;
+        setData({
+          cH: corner(hId), cA: corner(aId), yH: yellow(hId), yA: yellow(aId),
+          status: fx?.fixture?.status?.short, elapsed: fx?.fixture?.status?.elapsed, extra: fx?.fixture?.status?.extra,
+          gh: fx?.goals?.home, ga: fx?.goals?.away,
+        });
+      } catch { /* bỏ qua, lần sau thử lại */ }
+    };
+    fetchData();
+    const timer = setInterval(fetchData, 60000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [match.fixture.id, hId, aId]);
+
+  if (!data) return <span style={{ fontSize: 11, color: C.dim, marginLeft: 6 }}>· đang tải số liệu…</span>;
+  const done = ["FT", "AET", "PEN"].includes(data.status);
+  const timeStr = data.elapsed != null ? `${data.elapsed}${data.extra ? "+" + data.extra : ""}'` : "";
+  return (
+    <div style={{ marginTop: 4, marginLeft: 18 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: done ? C.green : "#FF6B7A" }}>
+        {done
+          ? `✓ ĐÃ KẾT THÚC · ${data.gh ?? match.goals.home}-${data.ga ?? match.goals.away}`
+          : `🔴 ${koLabel[data.status] || "Đang đá"} ${timeStr} · ${data.gh ?? 0}-${data.ga ?? 0}`}
+      </div>
+      <div style={{ fontSize: 12, color: C.sub, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <span>🚩 Phạt góc: <b style={{ color: C.text }}>{data.cH}</b> - <b style={{ color: C.text }}>{data.cA}</b></span>
+        <span>🟨 Thẻ vàng: <b style={{ color: C.text }}>{data.yH}</b> - <b style={{ color: C.text }}>{data.yA}</b></span>
+      </div>
+    </div>
+  );
+}
+
 function Groups({ groups, onOpen }) {
   const ids = Object.keys(groups).sort();
   return (
@@ -230,6 +283,7 @@ function Groups({ groups, onOpen }) {
                   return (
                     <div key={m.fixture.id} style={{ fontSize: 13, color: C.text, fontWeight: 600, padding: "2px 0" }}>
                       🕒 <b style={{ color: C.gold }}>{tt.time}</b> · {m.teams.home.name} <span style={{ color: C.sub }}>vs</span> {m.teams.away.name}
+                      {isLive(m) && <LiveMini match={m} />}
                     </div>
                   );
                 })}
@@ -344,7 +398,7 @@ function Knockout({ knockout, onOpenMatch }) {
                       <span style={{ minWidth: 50, textAlign: "center", fontWeight: 800, color: done ? C.gold : C.dim }}>{done ? sc : "vs"}</span>
                       <span style={{ flex: 1, textAlign: "left", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>{m.teams.away.logo && <img src={m.teams.away.logo} width={22} height={22} alt="" />} {m.teams.away.name || "Chưa xác định"}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>📍 {m.fixture.venue?.name || "—"}{m.fixture.venue?.city ? `, ${m.fixture.venue.city}` : ""}</div>
+                    <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}></div>
                   </button>
                 );
               })}
@@ -467,7 +521,7 @@ function Group({ g, fixtures, onOpenMatch }) {
                 <span style={{ minWidth: 56, textAlign: "center", fontWeight: 800, color: done ? C.gold : live ? "#FF6B7A" : C.dim }}>{done || live ? `${m.goals.home ?? 0}-${m.goals.away ?? 0}` : "vs"}</span>
                 <span style={{ flex: 1, textAlign: "left", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}><img src={m.teams.away.logo} width={22} height={22} alt="" /> {m.teams.away.name}</span>
               </div>
-              <div style={{ fontSize: 13, color: C.sub, marginTop: 8 }}>📍 {m.fixture.venue?.name || "—"}{m.fixture.venue?.city ? `, ${m.fixture.venue.city}` : ""}</div>
+              <div style={{ fontSize: 13, color: C.sub, marginTop: 4 }}></div>
             </button>
           );
         })}
@@ -661,6 +715,7 @@ function Match({ g, match }) {
         setLive({
           status: fx.fixture?.status?.short,
           elapsed: fx.fixture?.status?.elapsed,
+          extra: fx.fixture?.status?.extra,
           gh: fx.goals?.home,
           ga: fx.goals?.away,
         });
@@ -709,7 +764,7 @@ function Match({ g, match }) {
   }, [match, loadLive]);
 
   // Tỉ số hiện tại (ưu tiên dữ liệu live mới nhất, nếu chưa có thì lấy từ match ban đầu)
-  const liveStatLabel = { "1H": "Hiệp 1", "HT": "Nghỉ giữa hiệp", "2H": "Hiệp 2", "ET": "Hiệp phụ", "BT": "Nghỉ hiệp phụ", "P": "Luân lưu", "LIVE": "Đang đá", "INT": "Tạm dừng" };
+  const liveStatLabel = { "1H": "Hiệp 1", "HT": "Nghỉ giữa hiệp", "2H": "Hiệp 2", "ET": "Hiệp phụ", "BT": "Nghỉ hiệp phụ", "P": "Đá luân lưu", "LIVE": "Đang đá", "INT": "Tạm dừng", "SUSP": "Tạm hoãn" };
 
 
   const stat = (teamId, type) => {
@@ -993,6 +1048,13 @@ function Match({ g, match }) {
           </div>
           <Side team={match.teams.away} />
         </div>
+        {done && (
+          <div style={{ textAlign: "center", marginTop: 10 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(34,197,94,.15)", border: `1px solid ${C.green}`, borderRadius: 999, padding: "4px 16px", fontWeight: 800, fontSize: 13, color: C.green }}>
+              ✓ {match.fixture?.status?.short === "PEN" ? "KẾT THÚC (luân lưu)" : match.fixture?.status?.short === "AET" ? "KẾT THÚC (hiệp phụ)" : "ĐÃ KẾT THÚC"}
+            </span>
+          </div>
+        )}
         {isLive(match) && (
           <div style={{ textAlign: "center", marginTop: 10 }}>
             <span className="live-banner" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(230,57,70,.18)", border: `1px solid ${C.accent}`, borderRadius: 999, padding: "4px 14px" }}>
@@ -1001,11 +1063,12 @@ function Match({ g, match }) {
                 {liveStatLabel[live?.status] || "ĐANG ĐÁ"}
               </span>
             </span>
-            {/* Đồng hồ số: hiển thị phút thi đấu hiện tại, cập nhật theo dữ liệu live */}
+            {/* Đồng hồ số: hiển thị phút thi đấu hiện tại + bù giờ, cập nhật theo dữ liệu live */}
             {live?.elapsed != null && (
               <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
                 <div style={{ display: "inline-flex", alignItems: "baseline", gap: 4, background: "#0A0E18", border: `2px solid ${C.accent}`, borderRadius: 12, padding: "8px 18px", boxShadow: "0 0 16px rgba(230,57,70,.35)" }}>
                   <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 34, color: "#FF6B7A", lineHeight: 1, letterSpacing: 1 }}>{String(live.elapsed).padStart(2, "0")}</span>
+                  {live.extra != null && live.extra > 0 && <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 22, color: C.gold, lineHeight: 1 }}>+{live.extra}</span>}
                   <span style={{ fontWeight: 800, fontSize: 18, color: C.gold }}>'</span>
                   {live.status === "HT" && <span style={{ fontSize: 12, color: C.sub, marginLeft: 4 }}>nghỉ</span>}
                 </div>
@@ -1013,7 +1076,7 @@ function Match({ g, match }) {
             )}
           </div>
         )}
-        <div style={{ textAlign: "center", fontSize: 13, color: C.sub, marginTop: 12 }}>📍 {match.fixture.venue?.name || "—"}</div>
+        <div style={{ textAlign: "center", fontSize: 13, color: C.sub, marginTop: 4 }}></div>
         {referee
           ? <div style={{ textAlign: "center", fontSize: 12, color: C.gold, marginTop: 6 }}>🧑‍⚖️ Trọng tài: {referee}</div>
           : !done && <div style={{ textAlign: "center", fontSize: 12, color: C.dim, marginTop: 6 }}>🧑‍⚖️ Trọng tài: chưa công bố</div>}
