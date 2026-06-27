@@ -238,26 +238,30 @@ function LiveMini({ match, compact }) {
     : `${koLabel[data.status] || "Đang đá"}${timeStr ? " " + timeStr : ""}`;
 
   // Một dòng số liệu: nhãn ở giữa, số 2 đội 2 bên
-  const StatRow = ({ label, h, a, highlight }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "4px 0" }}>
-      <span style={{ textAlign: "right", fontWeight: 800, fontSize: 15, color: highlight ? C.text : C.text }}>{h}</span>
-      <span style={{ textAlign: "center", fontSize: 11, color: C.sub, padding: "0 14px", whiteSpace: "nowrap" }}>{label}</span>
-      <span style={{ textAlign: "left", fontWeight: 800, fontSize: 15, color: highlight ? C.text : C.text }}>{a}</span>
+  const StatRow = ({ label, h, a }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "3px 0" }}>
+      <span style={{ textAlign: "right", fontWeight: 800, fontSize: 15, color: C.text }}>{h}</span>
+      <span style={{ textAlign: "center", fontSize: 11, color: C.sub, padding: "0 16px", whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ textAlign: "left", fontWeight: 800, fontSize: 15, color: C.text }}>{a}</span>
     </div>
   );
 
   return (
     <div style={{ marginTop: compact ? 8 : 4, marginLeft: compact ? 0 : 18 }}>
-      {/* Trạng thái + phút, căn giữa, không nền */}
-      <div style={{ textAlign: "center", marginBottom: 4 }}>
+      {/* Trạng thái + phút, căn giữa */}
+      <div style={{ textAlign: "center", marginBottom: 6 }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, color: done ? C.green : "#FF6B7A" }}>
           {done ? "✓" : <span className="live-dot" />} {statusText}
         </span>
       </div>
-      {/* Bảng số liệu: tỉ số nổi bật + phạt góc + thẻ vàng, tên đội 2 bên */}
-      <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "8px 12px" }}>
-        <StatRow label="TỈ SỐ" h={data.gh ?? 0} a={data.ga ?? 0} highlight />
-        <div style={{ height: 1, background: "rgba(255,255,255,.06)", margin: "2px 0" }} />
+      {/* TỈ SỐ TO ở giữa, là chính */}
+      <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <span style={{ fontWeight: 900, fontSize: 30, color: done ? C.gold : "#FF6B7A", letterSpacing: 2 }}>
+          {data.gh ?? 0} - {data.ga ?? 0}
+        </span>
+      </div>
+      {/* Phạt góc + thẻ vàng: số chia 2 bên */}
+      <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "6px 12px" }}>
         <StatRow label="Phạt góc" h={data.cH} a={data.cA} />
         <StatRow label="Thẻ vàng" h={data.yH} a={data.yA} />
       </div>
