@@ -447,11 +447,11 @@ function Group({ g, fixtures, onOpenMatch }) {
           const live = isLive(m); const today = !done && !live && isToday(m.fixture?.date); const soon = !done && !live && isSoon24h(m.fixture?.date);
           const sc = `${m.goals.home ?? "-"}-${m.goals.away ?? "-"}`;
           return (
-            <button key={m.fixture.id} onClick={() => onOpenMatch(m)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${live ? C.accent : today ? "#FF8C42" : C.line}`, borderRadius: 14, padding: 14, color: "inherit" }}>
+            <button key={m.fixture.id} onClick={() => onOpenMatch(m)} className={live ? "card live-banner" : "card"} style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${live ? C.accent : today ? "#FF8C42" : C.line}`, borderRadius: 14, padding: 14, color: "inherit" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                 <span className={live ? "blink-text" : today ? "blink-text-soft" : soon ? "blink-text-soft" : ""} style={{ fontSize: 14, color: live ? "#FF6B7A" : today ? "#FF8C42" : soon ? C.gold : C.text, fontWeight: (live || today || soon) ? 800 : 600 }}>📅 {t.date} &nbsp;🕒 {t.time}</span>
                 {live ? (
-                  <span className="pill" style={{ background: "rgba(230,57,70,.2)", color: "#FF6B7A", display: "inline-flex", alignItems: "center", gap: 5 }}><span className="live-dot" /> ĐANG ĐÁ</span>
+                  <span className="pill live-banner" style={{ background: "rgba(230,57,70,.2)", color: "#FF6B7A", display: "inline-flex", alignItems: "center", gap: 5 }}><span className="live-dot" /> ĐANG ĐÁ</span>
                 ) : done ? (
                   <span className="pill" style={{ background: "rgba(34,197,94,.15)", color: C.green }}>ĐÃ ĐÁ</span>
                 ) : today ? (
@@ -464,7 +464,7 @@ function Group({ g, fixtures, onOpenMatch }) {
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <span style={{ flex: 1, textAlign: "right", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>{m.teams.home.name} <img src={m.teams.home.logo} width={22} height={22} alt="" /></span>
-                <span style={{ minWidth: 56, textAlign: "center", fontWeight: 800, color: done ? C.gold : C.dim }}>{done ? sc : "vs"}</span>
+                <span style={{ minWidth: 56, textAlign: "center", fontWeight: 800, color: done ? C.gold : live ? "#FF6B7A" : C.dim }}>{done || live ? `${m.goals.home ?? 0}-${m.goals.away ?? 0}` : "vs"}</span>
                 <span style={{ flex: 1, textAlign: "left", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}><img src={m.teams.away.logo} width={22} height={22} alt="" /> {m.teams.away.name}</span>
               </div>
               <div style={{ fontSize: 13, color: C.sub, marginTop: 8 }}>📍 {m.fixture.venue?.name || "—"}{m.fixture.venue?.city ? `, ${m.fixture.venue.city}` : ""}</div>
@@ -1417,4 +1417,3 @@ function FormBox({ t }) {
     </div>
   );
 }
-
