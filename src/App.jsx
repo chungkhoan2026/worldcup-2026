@@ -196,7 +196,7 @@ function isLive(m) { return ["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"].i
 
 // Hiển thị nhanh tỉ số + phạt góc + thẻ vàng cho 1 trận đang đá, ngay trong thẻ bảng.
 // Tự tải thống kê + sự kiện; tự làm mới mỗi 60 giây (nhẹ hơn khu chi tiết để tiết kiệm lượt API).
-function LiveMini({ match }) {
+function LiveMini({ match, compact }) {
   const [data, setData] = useState(null);
   const hId = match.teams.home.id, aId = match.teams.away.id;
   const koLabel = { "1H": "Hiệp 1", "HT": "Nghỉ", "2H": "Hiệp 2", "ET": "Hiệp phụ", "BT": "Nghỉ HP", "P": "Luân lưu", "INT": "Tạm dừng" };
@@ -215,7 +215,7 @@ function LiveMini({ match }) {
         const stats = rSt.response || [];
         const events = rEv.response || [];
         const fx = rFx.response?.[0];
-        const corner = (tid) => { const b = stats.find(s => s.team.id === tid); const it = b?.statistics?.find(x => x.type === "Corner Kicks"); return it?.value ?? "—"; };
+        const corner = (tid) => { const b = stats.find(s => s.team.id === tid); const it = b?.statistics?.find(x => x.type === "Corner Kicks"); return it?.value ?? 0; };
         const yellow = (tid) => events.filter(e => e.type === "Card" && e.detail === "Yellow Card" && e.team?.id === tid).length;
         setData({
           cH: corner(hId), cA: corner(aId), yH: yellow(hId), yA: yellow(aId),
@@ -233,15 +233,23 @@ function LiveMini({ match }) {
   const done = ["FT", "AET", "PEN"].includes(data.status);
   const timeStr = data.elapsed != null ? `${data.elapsed}${data.extra ? "+" + data.extra : ""}'` : "";
   return (
-    <div style={{ marginTop: 4, marginLeft: 18 }}>
-      <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: done ? C.green : "#FF6B7A" }}>
-        {done
-          ? `✓ ĐÃ KẾT THÚC · ${data.gh ?? match.goals.home}-${data.ga ?? match.goals.away}`
-          : `🔴 ${koLabel[data.status] || "Đang đá"} ${timeStr} · ${data.gh ?? 0}-${data.ga ?? 0}`}
-      </div>
-      <div style={{ fontSize: 12, color: C.sub, display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <span>🚩 Phạt góc: <b style={{ color: C.text }}>{data.cH}</b> - <b style={{ color: C.text }}>{data.cA}</b></span>
-        <span>🟨 Thẻ vàng: <b style={{ color: C.text }}>{data.yH}</b> - <b style={{ color: C.text }}>{data.yA}</b></span>
+    <div style={{ marginTop: 4, marginLeft: compact ? 0 : 18 }}>
+      {!compact && (
+        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: done ? C.green : "#FF6B7A" }}>
+          {done
+            ? `✓ ĐÃ KẾT THÚC · ${data.gh ?? match.goals.home}-${data.ga ?? match.goals.away}`
+            : `🔴 ${koLabel[data.status] || "Đang đá"} ${timeStr} · ${data.gh ?? 0}-${data.ga ?? 0}`}
+        </div>
+      )}
+      {compact && !done && timeStr && (
+        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: "#FF6B7A", textAlign: "center" }}>🔴 {koLabel[data.status] || "Đang đá"} {timeStr}</div>
+      )}
+      {compact && done && (
+        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: C.green, textAlign: "center" }}>✓ ĐÃ KẾT THÚC</div>
+      )}
+      <div style={{ fontSize: 12, color: C.sub, display: "flex", flexDirection: "column", gap: 3, alignItems: compact ? "center" : "flex-start" }}>
+        <span>Phạt góc: <b style={{ color: C.text }}>{data.cH}</b> - <b style={{ color: C.text }}>{data.cA}</b></span>
+        <span>Thẻ vàng: <b style={{ color: C.text }}>{data.yH}</b> - <b style={{ color: C.text }}>{data.yA}</b></span>
       </div>
     </div>
   );
@@ -539,6 +547,7 @@ function Group({ g, fixtures, onOpenMatch }) {
                 <span style={{ minWidth: 56, textAlign: "center", fontWeight: 800, color: done ? C.gold : live ? "#FF6B7A" : C.dim }}>{done || live ? `${m.goals.home ?? 0}-${m.goals.away ?? 0}` : "vs"}</span>
                 <span style={{ flex: 1, textAlign: "left", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}><img src={m.teams.away.logo} width={22} height={22} alt="" /> {m.teams.away.name}</span>
               </div>
+              {live && <div style={{ marginTop: 6 }}><LiveMini match={m} compact /></div>}
               <div style={{ fontSize: 13, color: C.sub, marginTop: 4 }}></div>
             </button>
           );
