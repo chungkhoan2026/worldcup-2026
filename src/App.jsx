@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 /* WORLD CUP 2026 — Lịch & phân tích (giờ Việt Nam) — Người viết app: PAK
    Nguồn: API-Football (league=1, season=2026) qua hàm trung gian /api/football */
@@ -565,6 +565,13 @@ function Group({ g, fixtures, onOpenMatch }) {
                 <span style={{ flex: 1, textAlign: "left", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}><img src={m.teams.away.logo} width={22} height={22} alt="" /> {m.teams.away.name}</span>
               </div>
               {live && <div style={{ marginTop: 6 }}><LiveMini match={m} compact /></div>}
+              {done && (
+                <div style={{ marginTop: 6, textAlign: "center" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, color: C.green }}>
+                    ✓ {m.fixture?.status?.short === "PEN" ? "Kết thúc (luân lưu)" : m.fixture?.status?.short === "AET" ? "Kết thúc (hiệp phụ)" : "Trận đấu đã kết thúc"}
+                  </span>
+                </div>
+              )}
               <div style={{ fontSize: 13, color: C.sub, marginTop: 4 }}></div>
             </button>
           );
@@ -585,7 +592,9 @@ function Match({ g, match }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   // Dữ liệu trực tiếp khi trận đang đá
-  const [live, setLive] = useState(null);        // { status, elapsed, gh, ga }
+  const [live, setLive] = useState(null);        // { status, elapsed, extra, gh, ga }
+  const [clockSec, setClockSec] = useState(0);   // số giây tự đếm thêm kể từ mốc phút API trả về
+  const clockBase = useRef(null);                // { elapsed, extra, status, at } mốc lần API cập nhật gần nhất
   const [events, setEvents] = useState([]);       // diễn biến: bàn thắng, thẻ
   const [liveStats, setLiveStats] = useState([]); // thống kê hiện tại
   const [liveLoading, setLiveLoading] = useState(false);
@@ -756,13 +765,17 @@ function Match({ g, match }) {
       // Tìm đúng trận này trong danh sách các trận đang đá
       const fx = (rLive.response || []).find(f => f.fixture?.id === match.fixture.id);
       if (fx) {
-        setLive({
-          status: fx.fixture?.status?.short,
-          elapsed: fx.fixture?.status?.elapsed,
-          extra: fx.fixture?.status?.extra,
-          gh: fx.goals?.home,
-          ga: fx.goals?.away,
-        });
+        const st = fx.fixture?.status?.short;
+        const el = fx.fixture?.status?.elapsed;
+        const ex = fx.fixture?.status?.extra;
+        setLive({ status: st, elapsed: el, extra: ex, gh: fx.goals?.home, ga: fx.goals?.away });
+        // Đặt lại mốc đồng hồ để tự đếm tiếp từ phút API vừa trả về
+        if (el != null && ["1H", "2H", "ET"].includes(st)) {
+          clockBase.current = { elapsed: el, extra: ex || 0, status: st, at: Date.now() };
+          setClockSec(0);
+        } else {
+          clockBase.current = null; // nghỉ giữa hiệp/kết thúc thì không chạy đồng hồ
+        }
         if (fx.fixture?.referee) setReferee(fx.fixture.referee);
       }
       // Diễn biến: ưu tiên endpoint events RIÊNG (chắc chắn đầy đủ nhất);
@@ -799,13 +812,38 @@ function Match({ g, match }) {
     if (soonOrLive && !lineups && !lineupLoading) loadLineups();
   }, [match, done, lineups, lineupLoading, loadLineups]);
 
-  // Khi trận đang đá: tải ngay + tự động làm mới mỗi 45 giây. Ngừng khi rời trang hoặc trận kết thúc.
+  // Khi trận đang đá: tải ngay + tự động làm mới mỗi 20 giây. Ngừng khi rời trang hoặc trận kết thúc.
   useEffect(() => {
     if (!isLive(match)) return;
     loadLive();
     const timer = setInterval(loadLive, 20000);
     return () => clearInterval(timer);
   }, [match, loadLive]);
+
+  // Đồng hồ tự chạy: mỗi giây tăng bộ đếm để hiển thị nhích lên (giây là ước lượng giữa 2 lần API cập nhật)
+  useEffect(() => {
+    if (!isLive(match)) return;
+    const tick = setInterval(() => {
+      if (clockBase.current) setClockSec(Math.floor((Date.now() - clockBase.current.at) / 1000));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [match]);
+
+  // Tính phút:giây hiển thị trên đồng hồ, tự cộng dồn từ mốc API + số giây tự đếm
+  function liveClock() {
+    const b = clockBase.current;
+    if (!b) return null;
+    const totalSec = (b.elapsed * 60) + clockSec; // phút API * 60 + giây tự đếm
+    let mm = Math.floor(totalSec / 60);
+    const ss = totalSec % 60;
+    // Bù giờ: nếu vượt mốc 45' (hiệp 1) hoặc 90' (hiệp 2) thì hiển thị dạng 45+x / 90+x
+    let base = null;
+    if (b.status === "1H" && mm >= 45) base = 45;
+    else if (b.status === "2H" && mm >= 90) base = 90;
+    else if (b.status === "ET" && mm >= 120) base = 120;
+    if (base != null) return { main: base, extra: mm - base, ss, isExtra: true };
+    return { main: mm, extra: 0, ss, isExtra: false };
+  }
 
   // Tỉ số hiện tại (ưu tiên dữ liệu live mới nhất, nếu chưa có thì lấy từ match ban đầu)
   const liveStatLabel = { "1H": "Hiệp 1", "HT": "Nghỉ giữa hiệp", "2H": "Hiệp 2", "ET": "Hiệp phụ", "BT": "Nghỉ hiệp phụ", "P": "Đá luân lưu", "LIVE": "Đang đá", "INT": "Tạm dừng", "SUSP": "Tạm hoãn" };
@@ -1107,17 +1145,28 @@ function Match({ g, match }) {
                 {liveStatLabel[live?.status] || "ĐANG ĐÁ"}
               </span>
             </span>
-            {/* Đồng hồ số: hiển thị phút thi đấu hiện tại + bù giờ, cập nhật theo dữ liệu live */}
-            {live?.elapsed != null && (
-              <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
-                <div style={{ display: "inline-flex", alignItems: "baseline", gap: 4, background: "#0A0E18", border: `2px solid ${C.accent}`, borderRadius: 12, padding: "8px 18px", boxShadow: "0 0 16px rgba(230,57,70,.35)" }}>
-                  <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 34, color: "#FF6B7A", lineHeight: 1, letterSpacing: 1 }}>{String(live.elapsed).padStart(2, "0")}</span>
-                  {live.extra != null && live.extra > 0 && <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 22, color: C.gold, lineHeight: 1 }}>+{live.extra}</span>}
-                  <span style={{ fontWeight: 800, fontSize: 18, color: C.gold }}>'</span>
-                  {live.status === "HT" && <span style={{ fontSize: 12, color: C.sub, marginLeft: 4 }}>nghỉ</span>}
+            {/* Đồng hồ số: tự chạy phút:giây, hiện bù giờ khi vượt mốc 45/90 */}
+            {live?.elapsed != null && (() => {
+              const lc = liveClock();
+              const ss2 = lc ? String(lc.ss).padStart(2, "0") : "00";
+              return (
+                <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
+                  <div style={{ display: "inline-flex", alignItems: "baseline", gap: 3, background: "#0A0E18", border: `2px solid ${C.accent}`, borderRadius: 12, padding: "8px 18px", boxShadow: "0 0 16px rgba(230,57,70,.35)" }}>
+                    {live.status === "HT" ? (
+                      <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 22, color: C.gold, lineHeight: 1 }}>NGHỈ</span>
+                    ) : lc ? (
+                      <>
+                        <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 34, color: "#FF6B7A", lineHeight: 1, letterSpacing: 1 }}>{String(lc.main).padStart(2, "0")}</span>
+                        {lc.isExtra && lc.extra > 0 && <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 22, color: C.gold, lineHeight: 1 }}>+{lc.extra}</span>}
+                        <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 20, color: C.sub, lineHeight: 1 }}>:{ss2}</span>
+                      </>
+                    ) : (
+                      <span style={{ fontFamily: "'Courier New',monospace", fontWeight: 900, fontSize: 34, color: "#FF6B7A", lineHeight: 1 }}>{String(live.elapsed).padStart(2, "0")}'</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
         <div style={{ textAlign: "center", fontSize: 13, color: C.sub, marginTop: 4 }}></div>
