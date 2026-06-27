@@ -209,6 +209,10 @@ function Groups({ groups, onOpen }) {
         const soonMatches = groups[id]
           .filter((m) => isSoon24h(m.fixture?.date) && !isDone(m))
           .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+        // Các trận đã đá xong của bảng (kèm tỉ số), sắp theo thời gian
+        const doneMatches = groups[id]
+          .filter((m) => isDone(m))
+          .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
         return (
           <button key={id} onClick={() => onOpen(id)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
@@ -252,6 +256,18 @@ function Groups({ groups, onOpen }) {
                 <img src={t.logo} alt="" width={24} height={24} style={{ objectFit: "contain" }} /><span>{t.name}</span>
               </div>
             ))}
+            {doneMatches.length > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line2}` }}>
+                <div style={{ fontSize: 12, color: C.green, fontWeight: 700, marginBottom: 6 }}>Kết quả đã đá:</div>
+                {doneMatches.map((m) => (
+                  <div key={m.fixture.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "3px 0" }}>
+                    <span style={{ flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.teams.home.name}</span>
+                    <span style={{ fontWeight: 800, color: C.gold, minWidth: 44, textAlign: "center" }}>{m.goals.home}-{m.goals.away}</span>
+                    <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.teams.away.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </button>
         );
       })}
@@ -479,6 +495,7 @@ function Match({ g, match }) {
   const [lineups, setLineups] = useState(null);     // đội hình ra sân
   const [lineupLoading, setLineupLoading] = useState(false);
   const [lineupErr, setLineupErr] = useState("");
+  const [standing, setStanding] = useState(null); // bảng xếp hạng của bảng chứa 2 đội này
   const done = isDone(match);
   const t = toVN(match.fixture.date);
   const hId = match.teams.home.id, aId = match.teams.away.id;
@@ -580,6 +597,17 @@ function Match({ g, match }) {
         .then(j => { const ref = j.response?.[0]?.fixture?.referee; if (ref) setReferee(ref); })
         .catch(() => {});
 
+      // Tải bảng xếp hạng để biết bối cảnh: đội nào đã/sắp bị loại, đã qua vòng... (nền, không chặn)
+      fetch(API("standings", { league: WC_LEAGUE_ID, season: SEASON }))
+        .then(x => x.json())
+        .then(j => {
+          const allTables = j.response?.[0]?.league?.standings || [];
+          // Tìm bảng chứa cả 2 đội của trận này
+          const tbl = allTables.find(t => Array.isArray(t) && t.some(r => r.team?.id === hId) && t.some(r => r.team?.id === aId));
+          if (tbl) setStanding(tbl);
+        })
+        .catch(() => {});
+
       if (done) {
         const r = await fetch(API("fixtures/statistics", { fixture: match.fixture.id }));
         const j = await r.json(); setStats(j.response || []);
@@ -676,7 +704,7 @@ function Match({ g, match }) {
   useEffect(() => {
     if (!isLive(match)) return;
     loadLive();
-    const timer = setInterval(loadLive, 30000);
+    const timer = setInterval(loadLive, 20000);
     return () => clearInterval(timer);
   }, [match, loadLive]);
 
@@ -844,6 +872,57 @@ function Match({ g, match }) {
     return { outcomeOk, exactOk, predScore: v.scoreline, realScore: `${realH}-${realA}`, realLabel, predPick: v.pick };
   }
 
+  // Phân tích BỐI CẢNH bảng đấu: đội nào đã bị loại, đã/sắp qua vòng, còn cần gì
+  function contextAnalysis() {
+    if (!standing || standing.length === 0) return null;
+    const rowH = standing.find(r => r.team?.id === hId);
+    const rowA = standing.find(r => r.team?.id === aId);
+    if (!rowH || !rowA) return null;
+    const totalGroupMatches = 3; // mỗi đội đá 3 trận vòng bảng
+    const lines = [];
+
+    // Phân tích cho từng đội
+    for (const [row, name] of [[rowH, match.teams.home.name], [rowA, match.teams.away.name]]) {
+      const played = row.all?.played ?? 0;
+      const pts = row.points ?? 0;
+      const rank = row.rank ?? 0;
+      const remaining = totalGroupMatches - played;
+      const maxPossible = pts + remaining * 3; // điểm tối đa có thể đạt được
+
+      let status;
+      if (played >= totalGroupMatches) {
+        // Đã đá hết vòng bảng
+        if (rank <= 2) status = `đã kết thúc vòng bảng ở vị trí thứ ${rank} (${pts} điểm) — gần như chắc suất đi tiếp.`;
+        else if (rank === 3) status = `xếp thứ 3 bảng (${pts} điểm) — cơ hội đi tiếp phụ thuộc so sánh với các đội hạng ba bảng khác.`;
+        else status = `xếp cuối bảng (${pts} điểm) — gần như đã bị loại.`;
+      } else {
+        // Còn trận chưa đá
+        if (pts === 0 && played >= 2 && maxPossible < 3) status = `mới có ${pts} điểm sau ${played} trận, cơ hội đi tiếp rất mong manh.`;
+        else if (pts >= 6) status = `đang có ${pts} điểm sau ${played} trận, rất sáng cửa đi tiếp — có thể đá thoải mái.`;
+        else if (pts === 0 && played >= 2) status = `chưa có điểm nào sau ${played} trận, buộc phải thắng trận này để nuôi hy vọng.`;
+        else status = `đang có ${pts} điểm sau ${played} trận (xếp thứ ${rank}), vẫn còn cơ hội nhưng cần kết quả tốt.`;
+      }
+      lines.push(`${name} ${status}`);
+    }
+
+    // Động lực trận đấu
+    const hPlayed = rowH.all?.played ?? 0, aPlayed = rowA.all?.played ?? 0;
+    const hPts = rowH.points ?? 0, aPts = rowA.points ?? 0;
+    let motivation = "";
+    if (hPlayed >= 3 && aPlayed >= 3) {
+      motivation = "Cả hai đội đã đá xong vòng bảng — đây là dữ liệu để theo dõi, không còn ảnh hưởng tới việc đi tiếp.";
+    } else {
+      const hNeed = hPts < 6 && hPlayed < 3;
+      const aNeed = aPts < 6 && aPlayed < 3;
+      if (hNeed && aNeed) motivation = "Cả hai đội đều cần điểm để đi tiếp, nên đây hứa hẹn là trận cầu căng thẳng, đôi công.";
+      else if (hNeed) motivation = `${match.teams.home.name} cần điểm hơn nên nhiều khả năng sẽ chủ động tấn công.`;
+      else if (aNeed) motivation = `${match.teams.away.name} cần điểm hơn nên nhiều khả năng sẽ chủ động tấn công.`;
+      else motivation = "Cả hai đội đều đã tương đối ổn định về thứ hạng.";
+    }
+
+    return { lines, motivation };
+  }
+
   // Nhận định chữ dài, có lý lẽ
   function analysisText() {
     const fh = formHome, fa = formAway;
@@ -970,7 +1049,7 @@ function Match({ g, match }) {
 
           {lastUpdate && (
             <div style={{ fontSize: 11, color: C.dim, marginBottom: 12 }}>
-              Tự động làm mới mỗi 30 giây · Cập nhật lúc {toVN(lastUpdate.toISOString()).time}
+              Tự động làm mới mỗi 20 giây · Cập nhật lúc {toVN(lastUpdate.toISOString()).time}
             </div>
           )}
 
@@ -997,6 +1076,11 @@ function Match({ g, match }) {
             const shown = events.filter(e => ["Goal", "Card", "Var", "subst"].includes(e.type));
             return shown.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 36px 1fr", gap: 8, paddingBottom: 6, borderBottom: `1px solid ${C.line2}`, marginBottom: 4 }}>
+                <span style={{ textAlign: "right", fontWeight: 800, fontSize: 12, color: C.sub }}>{match.teams.home.name}</span>
+                <span></span>
+                <span style={{ textAlign: "left", fontWeight: 800, fontSize: 12, color: C.sub }}>{match.teams.away.name}</span>
+              </div>
               {shown.map((e, i) => {
                 const isHomeTeam = e.team?.id === hId;
                 let icon = "•", label = e.detail || e.type;
@@ -1004,11 +1088,20 @@ function Match({ g, match }) {
                 else if (e.type === "Card") { icon = e.detail === "Red Card" ? "🟥" : "🟨"; label = e.detail === "Red Card" ? "Thẻ đỏ" : "Thẻ vàng"; }
                 else if (e.type === "Var") { icon = "📺"; label = (e.detail || "").includes("Disallowed") ? "Bàn thắng bị từ chối (VAR)" : "VAR: " + (e.detail || ""); }
                 else if (e.type === "subst") { icon = "🔄"; label = "Thay người"; }
+                const content = (
+                  <span style={{ fontSize: 13, lineHeight: 1.4 }}>
+                    {icon} <b>{e.player?.name || "—"}</b> <span style={{ color: C.sub }}>({label})</span>
+                  </span>
+                );
+                const minute = <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{e.time?.elapsed}'</span>;
                 return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: isHomeTeam ? "flex-start" : "flex-end", textAlign: isHomeTeam ? "left" : "right", fontSize: 13 }}>
-                    {isHomeTeam && <span style={{ minWidth: 34, color: C.gold, fontWeight: 800 }}>{e.time?.elapsed}'</span>}
-                    <span>{icon} <b>{e.player?.name || "—"}</b> <span style={{ color: C.sub }}>({label})</span></span>
-                    {!isHomeTeam && <span style={{ minWidth: 34, color: C.gold, fontWeight: 800 }}>{e.time?.elapsed}'</span>}
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 36px 1fr", alignItems: "center", gap: 8, padding: "3px 0", borderBottom: i < shown.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
+                    {/* Cột trái = đội nhà */}
+                    <span style={{ textAlign: "right", color: isHomeTeam ? C.text : "transparent" }}>{isHomeTeam ? content : null}</span>
+                    {/* Cột giữa = phút */}
+                    <span style={{ textAlign: "center" }}>{minute}</span>
+                    {/* Cột phải = đội khách */}
+                    <span style={{ textAlign: "left", color: !isHomeTeam ? C.text : "transparent" }}>{!isHomeTeam ? content : null}</span>
                   </div>
                 );
               })}
@@ -1218,6 +1311,23 @@ function Match({ g, match }) {
           {v && (
             <div style={{ background: "linear-gradient(135deg,#1A2440,#13192B)", border: `1px solid ${C.line2}`, borderRadius: 14, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10, color: C.gold }}>✨ Nhận định & dự đoán</div>
+
+              {(() => {
+                const ctx = contextAnalysis();
+                return ctx ? (
+                  <div style={{ background: "rgba(96,165,250,.10)", border: "1px solid #60A5FA", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#60A5FA", marginBottom: 8 }}>🎯 Bối cảnh bảng đấu</div>
+                    {ctx.lines.map((ln, i) => (
+                      <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: "#D5DEEC", marginBottom: 5, display: "flex", gap: 6 }}>
+                        <span style={{ color: "#60A5FA" }}>•</span><span>{ln}</span>
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 13, lineHeight: 1.7, color: "#E7ECF3", marginTop: 8, fontStyle: "italic" }}>{ctx.motivation}</div>
+                    <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>Lưu ý: việc đi tiếp của đội hạng ba còn phụ thuộc kết quả các bảng khác.</div>
+                  </div>
+                ) : null;
+              })()}
+
               {analysisText() && <div style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 12, color: "#D5DEEC" }}>{analysisText()}</div>}
               <div style={{ fontSize: 14, marginBottom: 12 }}>Đánh giá chung: <b>{v.pick}</b>. Dự đoán tỉ số: <b style={{ color: C.gold }}>{v.scoreline}</b>.</div>
               <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginBottom: 14 }}>
@@ -1307,3 +1417,4 @@ function FormBox({ t }) {
     </div>
   );
 }
+
