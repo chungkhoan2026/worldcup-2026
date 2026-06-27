@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 
 /* WORLD CUP 2026 — Lịch & phân tích (giờ Việt Nam) — Người viết app: PAK
@@ -237,12 +236,12 @@ function LiveMini({ match, compact }) {
     ? (data.status === "PEN" ? "KẾT THÚC (luân lưu)" : data.status === "AET" ? "KẾT THÚC (hiệp phụ)" : "ĐÃ KẾT THÚC")
     : `${koLabel[data.status] || "Đang đá"}${timeStr ? " " + timeStr : ""}`;
 
-  // Một dòng số liệu: nhãn ở giữa, số 2 đội 2 bên
+  // Một dòng số liệu: số áp sát 2 mép (đội nhà trái, đội khách phải), nhãn ở giữa
   const StatRow = ({ label, h, a }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "3px 0" }}>
-      <span style={{ textAlign: "right", fontWeight: 800, fontSize: 15, color: C.text }}>{h}</span>
-      <span style={{ textAlign: "center", fontSize: 11, color: C.sub, padding: "0 16px", whiteSpace: "nowrap" }}>{label}</span>
-      <span style={{ textAlign: "left", fontWeight: 800, fontSize: 15, color: C.text }}>{a}</span>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px" }}>
+      <span style={{ fontWeight: 900, fontSize: 17, color: C.text, minWidth: 24, textAlign: "left" }}>{h}</span>
+      <span style={{ fontSize: 11, color: C.sub, whiteSpace: "nowrap", flex: 1, textAlign: "center" }}>{label}</span>
+      <span style={{ fontWeight: 900, fontSize: 17, color: C.text, minWidth: 24, textAlign: "right" }}>{a}</span>
     </div>
   );
 
@@ -260,8 +259,8 @@ function LiveMini({ match, compact }) {
           {data.gh ?? 0} - {data.ga ?? 0}
         </span>
       </div>
-      {/* Phạt góc + thẻ vàng: số chia 2 bên */}
-      <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "6px 12px" }}>
+      {/* Phạt góc + thẻ vàng: số áp sát 2 bên */}
+      <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "6px 18px" }}>
         <StatRow label="Phạt góc" h={data.cH} a={data.cA} />
         <StatRow label="Thẻ vàng" h={data.yH} a={data.yA} />
       </div>
