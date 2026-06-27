@@ -740,6 +740,30 @@ function Match({ g, match }) {
   // điểm phong độ (thắng 3, hòa 1)
   const pts = (fm) => fm ? fm.w * 3 + fm.d : 0;
 
+  // Suy đoán nguy cơ một đội XOAY TUA đội hình dự bị (đã chắc suất hoặc đã hết cơ hội ở lượt cuối)
+  function rotationInfo() {
+    if (!standing || standing.length === 0) return { hRotate: false, aRotate: false, note: null };
+    const rowH = standing.find(r => r.team?.id === hId);
+    const rowA = standing.find(r => r.team?.id === aId);
+    if (!rowH || !rowA) return { hRotate: false, aRotate: false, note: null };
+    // "Có thể xoay tua" khi: đã đá >=2 trận VÀ (đã rất chắc suất: >=6đ và đứng nhất/nhì) HOẶC (gần như hết cơ hội)
+    const judge = (row) => {
+      const played = row.all?.played ?? 0;
+      const pts = row.points ?? 0;
+      const rank = row.rank ?? 9;
+      if (played < 2) return false;
+      const lockedIn = pts >= 6 && rank <= 2;        // gần chắc đi tiếp
+      const eliminated = pts === 0 && played >= 2;    // gần như hết cơ hội
+      return lockedIn || eliminated;
+    };
+    const hRotate = judge(rowH), aRotate = judge(rowA);
+    let note = null;
+    if (hRotate && aRotate) note = `Cả hai đội đều có thể đã an bài về thứ hạng và có khả năng tung đội hình dự bị để giữ sức — kết quả thực tế có thể khác xa dự đoán.`;
+    else if (hRotate) note = `${match.teams.home.name} nhiều khả năng đã yên tâm về thứ hạng, có thể xoay tua đội hình ở trận này — dự đoán dưới đây có thể không phản ánh đúng sức mạnh thực tế trên sân.`;
+    else if (aRotate) note = `${match.teams.away.name} nhiều khả năng đã yên tâm về thứ hạng, có thể xoay tua đội hình ở trận này — dự đoán dưới đây có thể không phản ánh đúng sức mạnh thực tế trên sân.`;
+    return { hRotate, aRotate, note };
+  }
+
   function verdict() {
     const fh = formHome, fa = formAway, hs = h2hSummary();
     if (!fh && !fa) return null;
@@ -785,19 +809,19 @@ function Match({ g, match }) {
     };
     let gH = Math.max(0, smartRound(expH));
     let gA = Math.max(0, smartRound(expA));
-    // Nếu ra hòa nhưng một đội nhỉnh hơn rõ về phong độ thì cộng 1 bàn cho đội đó
-    if (gH === gA && Math.abs(diff) >= 3) { if (diff > 0) gH++; else gA++; }
+    // Chỉ phá thế hòa khi một đội nhỉnh hơn HẲN về phong độ (chênh >= 6 điểm, tức ~2 trận thắng)
+    if (gH === gA && Math.abs(diff) >= 6) { if (diff > 0) gH++; else gA++; }
     // "Điểm vượt trội tổng hợp": gộp công, thủ, phong độ, đối đầu để đo mức chênh lệch đẳng cấp
     const domH = (hAtkR + hDefR) + diff * 0.10 + (hs && hs.total ? (hs.hw - hs.aw) * 0.3 + (hs.gdSum / hs.total) * 0.3 : 0);
     const domA = (aAtkR + aDefR) - diff * 0.10 + (hs && hs.total ? (hs.aw - hs.hw) * 0.3 - (hs.gdSum / hs.total) * 0.3 : 0);
     const domGap = domH - domA;
-    // Nếu một đội vượt trội rõ rệt mà tỉ số dự đoán vẫn sát, nới cách biệt cho đúng thực tế
-    if (Math.abs(domGap) >= 1.0 && Math.abs(gH - gA) <= 1) {
+    // Chỉ nới cách biệt khi một đội vượt trội RÕ RỆT (ngưỡng cao hơn để giữ được các trận hòa cân sức)
+    if (Math.abs(domGap) >= 1.8 && Math.abs(gH - gA) <= 1) {
       if (domGap > 0) gH = Math.max(gH, gA + 2);
       else gA = Math.max(gA, gH + 2);
     }
     // Đội vượt trội cực mạnh (chênh rất lớn) => đảm bảo cách biệt tối thiểu 3 bàn
-    if (Math.abs(domGap) >= 2.2) {
+    if (Math.abs(domGap) >= 2.8) {
       if (domGap > 0 && gH - gA < 3) gH = gA + 3;
       else if (domGap < 0 && gA - gH < 3) gA = gH + 3;
     }
@@ -812,8 +836,13 @@ function Match({ g, match }) {
     let hWin = 38 + diff * 3 + domGap * 7;
     let aWin = 38 - diff * 3 - domGap * 7;
     if (hs && hs.total) { hWin += (hs.hw - hs.aw) * 2; aWin += (hs.aw - hs.hw) * 2; }
+    // Nếu nghi đội mạnh hơn xoay tua đội hình dự bị: kéo % về gần nhau hơn (tăng bất ngờ/hòa)
+    const rot = rotationInfo();
+    if (rot.hRotate && !rot.aRotate) { hWin -= 12; aWin += 6; }       // đội nhà có thể xoay tua
+    else if (rot.aRotate && !rot.hRotate) { aWin -= 12; hWin += 6; }  // đội khách có thể xoay tua
     hWin = Math.max(8, Math.min(85, hWin)); aWin = Math.max(8, Math.min(85, aWin));
-    const drawP = Math.max(8, 100 - hWin - aWin);
+    let drawP = Math.max(8, 100 - hWin - aWin);
+    if (rot.hRotate || rot.aRotate) drawP += 6; // cả hai trường hợp đều tăng nhẹ khả năng hòa/bất ngờ
     const sum = hWin + aWin + drawP;
     const pHome = Math.round(hWin / sum * 100), pDraw = Math.round(drawP / sum * 100), pAway = Math.round(aWin / sum * 100);
 
@@ -1329,6 +1358,16 @@ function Match({ g, match }) {
               })()}
 
               {analysisText() && <div style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 12, color: "#D5DEEC" }}>{analysisText()}</div>}
+
+              {(() => {
+                const rot = rotationInfo();
+                return rot.note ? (
+                  <div style={{ background: "rgba(255,140,66,.12)", border: "1px solid #FF8C42", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#FF8C42", marginBottom: 6 }}>🔄 Lưu ý xoay tua đội hình</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.7, color: "#E7ECF3" }}>{rot.note}</div>
+                  </div>
+                ) : null;
+              })()}
               <div style={{ fontSize: 14, marginBottom: 12 }}>Đánh giá chung: <b>{v.pick}</b>. Dự đoán tỉ số: <b style={{ color: C.gold }}>{v.scoreline}</b>.</div>
               <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginBottom: 14 }}>
                 <Pred label={match.teams.home.name} value={v.pHome + "%"} />
@@ -1358,7 +1397,10 @@ function Match({ g, match }) {
               {(styleHome?.corners != null || styleAway?.corners != null) && (() => {
                 const cH = styleHome?.corners ?? 5;   // mặc định 5 nếu thiếu dữ liệu 1 đội
                 const cA = styleAway?.corners ?? 5;
-                const totalCorners = Math.round(cH + cA);
+                // Khi 2 đội gặp nhau, hàng thủ kìm hãm nhau nên tổng phạt góc thường THẤP hơn
+                // tổng trung bình đơn thuần. Dùng hệ số 0.85 và chặn trong khoảng thực tế (6–14).
+                let totalCorners = Math.round((cH + cA) * 0.85);
+                totalCorners = Math.max(6, Math.min(14, totalCorners));
                 // Khoảng 2 số liền nhau quanh giá trị trung bình (vd 10 => 10–11)
                 const low = totalCorners, high = totalCorners + 1;
                 return (
