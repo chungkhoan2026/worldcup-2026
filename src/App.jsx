@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 
 /* WORLD CUP 2026 — Lịch & phân tích (giờ Việt Nam) — Người viết app: PAK
@@ -232,24 +233,33 @@ function LiveMini({ match, compact }) {
   if (!data) return <span style={{ fontSize: 11, color: C.dim, marginLeft: 6 }}>· đang tải số liệu…</span>;
   const done = ["FT", "AET", "PEN"].includes(data.status);
   const timeStr = data.elapsed != null ? `${data.elapsed}${data.extra ? "+" + data.extra : ""}'` : "";
+  const statusText = done
+    ? (data.status === "PEN" ? "KẾT THÚC (luân lưu)" : data.status === "AET" ? "KẾT THÚC (hiệp phụ)" : "ĐÃ KẾT THÚC")
+    : `${koLabel[data.status] || "Đang đá"}${timeStr ? " " + timeStr : ""}`;
+
+  // Một dòng số liệu: nhãn ở giữa, số 2 đội 2 bên
+  const StatRow = ({ label, h, a, highlight }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "4px 0" }}>
+      <span style={{ textAlign: "right", fontWeight: 800, fontSize: 15, color: highlight ? C.text : C.text }}>{h}</span>
+      <span style={{ textAlign: "center", fontSize: 11, color: C.sub, padding: "0 14px", whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ textAlign: "left", fontWeight: 800, fontSize: 15, color: highlight ? C.text : C.text }}>{a}</span>
+    </div>
+  );
+
   return (
-    <div style={{ marginTop: 4, marginLeft: compact ? 0 : 18 }}>
-      {!compact && (
-        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: done ? C.green : "#FF6B7A" }}>
-          {done
-            ? `✓ ĐÃ KẾT THÚC · ${data.gh ?? match.goals.home}-${data.ga ?? match.goals.away}`
-            : `🔴 ${koLabel[data.status] || "Đang đá"} ${timeStr} · ${data.gh ?? 0}-${data.ga ?? 0}`}
-        </div>
-      )}
-      {compact && !done && timeStr && (
-        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: "#FF6B7A", textAlign: "center" }}>🔴 {koLabel[data.status] || "Đang đá"} {timeStr}</div>
-      )}
-      {compact && done && (
-        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: C.green, textAlign: "center" }}>✓ ĐÃ KẾT THÚC</div>
-      )}
-      <div style={{ fontSize: 12, color: C.sub, display: "flex", flexDirection: "column", gap: 3, alignItems: compact ? "center" : "flex-start" }}>
-        <span>Phạt góc: <b style={{ color: C.text }}>{data.cH}</b> - <b style={{ color: C.text }}>{data.cA}</b></span>
-        <span>Thẻ vàng: <b style={{ color: C.text }}>{data.yH}</b> - <b style={{ color: C.text }}>{data.yA}</b></span>
+    <div style={{ marginTop: compact ? 8 : 4, marginLeft: compact ? 0 : 18 }}>
+      {/* Trạng thái + phút, căn giữa, không nền */}
+      <div style={{ textAlign: "center", marginBottom: 4 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, color: done ? C.green : "#FF6B7A" }}>
+          {done ? "✓" : <span className="live-dot" />} {statusText}
+        </span>
+      </div>
+      {/* Bảng số liệu: tỉ số nổi bật + phạt góc + thẻ vàng, tên đội 2 bên */}
+      <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "8px 12px" }}>
+        <StatRow label="TỈ SỐ" h={data.gh ?? 0} a={data.ga ?? 0} highlight />
+        <div style={{ height: 1, background: "rgba(255,255,255,.06)", margin: "2px 0" }} />
+        <StatRow label="Phạt góc" h={data.cH} a={data.cA} />
+        <StatRow label="Thẻ vàng" h={data.yH} a={data.yA} />
       </div>
     </div>
   );
@@ -280,21 +290,25 @@ function Groups({ groups, onOpen }) {
           .filter((m) => isDone(m))
           .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
         return (
-          <button key={id} onClick={() => onOpen(id)} className={liveMatches.length > 0 ? "card live-banner" : "card"} style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${liveMatches.length > 0 ? C.accent : C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
+          <button key={id} onClick={() => onOpen(id)} className="card" style={{ textAlign: "left", cursor: "pointer", background: C.card, border: `1px solid ${liveMatches.length > 0 ? C.accent : C.line}`, borderRadius: 16, padding: 18, color: "inherit" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
               <span style={{ fontWeight: 800, fontSize: 18, color: C.accent }}>Bảng {id}</span>
               <span className="pill" style={{ background: C.line, color: "#9FB0C9" }}>{done}/{groups[id].length} đã đá</span>
             </div>
             {liveMatches.length > 0 && (
-              <div className="live-banner" style={{ background: "rgba(230,57,70,.14)", border: `1px solid ${C.accent}`, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+              <div style={{ background: C.card, border: `1px solid ${C.accent}`, borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                   <span className="live-dot" />
                   <span style={{ fontWeight: 800, fontSize: 13, color: "#FF6B7A", letterSpacing: ".5px" }}>ĐANG ĐÁ</span>
                 </div>
-                {liveMatches.map((m) => (
-                  <div key={m.fixture.id} style={{ fontSize: 13, color: C.text, fontWeight: 600, padding: "2px 0" }}>
-                    {m.teams.home.name} <span style={{ color: C.sub }}>vs</span> {m.teams.away.name}
-                    <LiveMini match={m} />
+                {liveMatches.map((m, idx) => (
+                  <div key={m.fixture.id} style={{ paddingTop: idx > 0 ? 10 : 0, marginTop: idx > 0 ? 10 : 0, borderTop: idx > 0 ? `1px solid ${C.line2}` : "none" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", fontSize: 14, fontWeight: 700, marginBottom: 2 }}>
+                      <span style={{ textAlign: "right" }}>{m.teams.home.name}</span>
+                      <span style={{ color: C.dim, fontSize: 11, padding: "0 10px" }}>vs</span>
+                      <span style={{ textAlign: "left" }}>{m.teams.away.name}</span>
+                    </div>
+                    <LiveMini match={m} compact />
                   </div>
                 ))}
               </div>
