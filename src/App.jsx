@@ -480,12 +480,14 @@ const KO_ORDER = [
 ];
 function koViName(round) {
   const low = (round || "").toLowerCase();
-  // "final" phải kiểm sau "semi-final"/"quarter-final" để không nhầm
+  // Thứ tự kiểm tra quan trọng: cụm cụ thể trước, "final" chung để cuối cùng.
   if (low.includes("semi")) return "Bán kết";
-  if (low.includes("quarter")) return "Tứ kết";
-  if (low.includes("round of 32") || low.includes("1/16")) return "Vòng 1/16";
-  if (low.includes("round of 16") || low.includes("1/8")) return "Vòng 1/8";
-  if (low.includes("3rd") || low.includes("third")) return "Tranh hạng ba";
+  if (low.includes("quarter") || low.includes("8th finals") || low.includes("quarter-finals")) return "Tứ kết";
+  // Vòng 1/16 (Round of 32): trận mở màn knock-out của giải 48 đội
+  if (low.includes("round of 32") || low.includes("1/16") || low.includes("round of 64")) return "Vòng 1/16";
+  // Vòng 1/8 (Round of 16 / Last 16 / 16th finals)
+  if (low.includes("round of 16") || low.includes("1/8") || low.includes("last 16") || low.includes("16th finals") || low.includes("eighth")) return "Vòng 1/8";
+  if (low.includes("3rd") || low.includes("third") || low.includes("play-off")) return "Tranh hạng ba";
   if (low.includes("final")) return "Chung kết";
   return round;
 }
@@ -497,10 +499,16 @@ function koRank(round) {
 }
 
 function Knockout({ knockout, onOpenMatch }) {
+  const [roundFilter, setRoundFilter] = useState("all"); // "all" hoặc tên tiếng Việt của vòng
   const rounds = knockout ? Object.keys(knockout) : [];
   // Sắp xếp các vòng theo thứ tự thi đấu
   const sortedRounds = [...rounds].sort((a, b) => koRank(a) - koRank(b));
   const hasAny = sortedRounds.length > 0;
+
+  // Danh sách các vòng (tiếng Việt) đang có dữ liệu, để làm nút lọc
+  const viRounds = [...new Set(sortedRounds.map(koViName))];
+  // Các vòng sau khi áp bộ lọc
+  const shownRounds = roundFilter === "all" ? sortedRounds : sortedRounds.filter(r => koViName(r) === roundFilter);
 
   return (
     <div>
@@ -513,7 +521,21 @@ function Knockout({ knockout, onOpenMatch }) {
         </div>
       )}
 
-      {sortedRounds.map((round) => {
+      {/* Thanh nút lọc vòng */}
+      {hasAny && viRounds.length > 1 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+          {[{ key: "all", label: "Tất cả" }, ...viRounds.map(v => ({ key: v, label: v }))].map(({ key, label }) => {
+            const active = roundFilter === key;
+            return (
+              <button key={key} onClick={() => setRoundFilter(key)} style={{ padding: "8px 14px", borderRadius: 999, fontWeight: 700, fontSize: 13, cursor: "pointer", border: `1px solid ${active ? C.accent : C.line2}`, background: active ? "rgba(230,57,70,.15)" : C.card, color: active ? "#FF6B7A" : C.sub }}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {shownRounds.map((round) => {
         const matches = [...knockout[round]].sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
         return (
           <div key={round} style={{ marginBottom: 24 }}>
@@ -557,7 +579,7 @@ function Knockout({ knockout, onOpenMatch }) {
         );
       })}
 
-      <QualifiedTeams />
+      {roundFilter === "all" && <QualifiedTeams />}
     </div>
   );
 }
