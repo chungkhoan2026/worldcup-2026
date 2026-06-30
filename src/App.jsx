@@ -1168,6 +1168,14 @@ function Match({ g, match }) {
       if (domGap > 0 && gH - gA < 3) gH = gA + 3;
       else if (domGap < 0 && gA - gH < 3) gA = gH + 3;
     }
+    // GIỚI HẠN THỰC TẾ: tránh tỉ số đậm phi lý. Vòng knock-out các đội đều mạnh và đá chặt,
+    // nên giới hạn chặt hơn vòng bảng.
+    const isKnockout = g === "KO";
+    const maxGoals = isKnockout ? 3 : 5;        // bàn tối đa mỗi đội
+    const maxDiff = isKnockout ? 2 : 4;          // cách biệt tối đa
+    gH = Math.min(gH, maxGoals); gA = Math.min(gA, maxGoals);
+    if (gH - gA > maxDiff) gH = gA + maxDiff;
+    if (gA - gH > maxDiff) gA = gH + maxDiff;
     const scoreline = `${gH}-${gA}`;
 
     let pick;
