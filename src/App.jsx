@@ -748,7 +748,12 @@ function RefereeInfo({ referee }) {
     finally { setLoading(false); }
   };
 
-  if (!referee) return null;
+  if (!referee) return (
+    <div style={{ background: "rgba(255,209,102,.08)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+      <div style={{ fontWeight: 700, fontSize: 13, color: C.gold, marginBottom: 6 }}>🧑‍⚖️ Phong cách trọng tài</div>
+      <div style={{ fontSize: 12, color: C.sub }}>Trọng tài của trận này chưa được công bố (thường công bố sát giờ thi đấu). Khi có tên trọng tài, mục này sẽ hiện thống kê thẻ phạt của ông ấy.</div>
+    </div>
+  );
   // Nhãn phong cách dựa trên thẻ vàng trung bình
   const styleLabel = (y) => y >= 5 ? "rất nghiêm khắc 🔴" : y >= 3.5 ? "nghiêm khắc" : y >= 2 ? "trung bình" : "dễ tính 🟢";
 
