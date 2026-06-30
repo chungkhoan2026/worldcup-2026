@@ -21,11 +21,49 @@ const DEEP_NOTES = {
       { h: "Cầu thủ nổi bật", t: "Canada: Jonathan David (dự kiến ghi bàn), Alphonso Davies. Nam Phi: trông chờ các tình huống cố định từ trung vệ hoặc tiền vệ." },
     ],
   },
+  "ivory coast|norway": {
+    title: "Nhận định chuyên sâu",
+    blocks: [
+      { h: "Phân tích cụ thể", t: "Na Uy dựa vào pressing tầm cao, thể lực bền bỉ và khả năng chuyển trạng thái nhanh. Bờ Biển Ngà mạnh ở tốc độ cá nhân, kỹ thuật và khai thác khoảng trống sau lưng hàng thủ đối phương. Trận đấu là sự đối đầu giữa tổ chức kỷ luật (Na Uy) và cá nhân xuất sắc (Bờ Biển Ngà)." },
+      { h: "Đánh giá chung từ thế giới & chuyên gia", t: "Các chuyên gia như Gary Neville (Sky Sports) và giới phân tích Opta đánh giá đây là cặp đấu cân bằng nhất ngày, hai đội đều có lối chơi hiện đại nhưng chưa nhiều kinh nghiệm ở giai đoạn knock-out. Na Uy nhỉnh hơn về thể lực, Bờ Biển Ngà nguy hiểm hơn ở khoảnh khắc quyết định." },
+      { h: "Dự đoán phổ biến", t: "Siêu máy tính Opta và phần lớn chuyên gia cho rằng trận sẽ rất chặt chẽ, ít bàn thắng trong 90 phút, dễ phải phân định bằng hiệp phụ hoặc penalty." },
+      { h: "Xác suất (theo mô phỏng)", t: "Thắng trong 90 phút: Na Uy ~45-48%, Bờ Biển Ngà ~38-42%, Hòa ~20-25%. Xác suất đi tiếp: Na Uy ~52-55%, Bờ Biển Ngà ~45-48%. Dự đoán bàn thắng: trung bình 2.4-2.6 bàn/trận, nhiều kịch bản phải kéo dài hiệp phụ/penalty. Siêu máy tính: trận rất cân bằng, Na Uy nhỉnh hơn nhẹ nhờ thể lực và tổ chức tốt hơn trong mô phỏng dài hạn." },
+      { h: "Nhận định tóm tắt", t: "Trận 'cân não', nơi sự ổn định tâm lý và khả năng tận dụng cơ hội sẽ quyết định người thắng cuộc." },
+      { h: "Dự đoán chi tiết", t: "Cả hai chơi thăm dò ở hiệp 1, pressing cao từ phút đầu. Na Uy có thể kiểm soát nhịp độ tốt hơn nhờ thể lực, nhưng Bờ Biển Ngà nguy hiểm ở phản công. Khả năng cao trận đấu kéo dài." },
+      { h: "Dự đoán kết quả", t: "Hòa 1-1 sau 90 phút, Na Uy thắng trên chấm penalty (hoặc Bờ Biển Ngà thắng sát nút 2-1 nếu tận dụng tốt tình huống cố định)." },
+    ],
+  },
+  "france|sweden": {
+    title: "Nhận định chuyên sâu",
+    blocks: [
+      { h: "Phân tích cụ thể", t: "Pháp sở hữu chiều sâu đội hình tuyệt vời, khả năng kiểm soát trận đấu và chuyển đổi nhanh từ phòng ngự sang tấn công. Thụy Điển dựa vào khối phòng ngự chắc chắn và pressing có tổ chức, nhưng thiếu ngôi sao sáng tạo để xuyên phá hàng thủ Pháp." },
+      { h: "Đánh giá chung từ thế giới & chuyên gia", t: "Thierry Henry, Rio Ferdinand và Opta đều coi Pháp là một trong những ứng viên vô địch hàng đầu. Thụy Điển được đánh giá cao về tính tổ chức nhưng khó cạnh tranh với chất lượng tổng thể của Pháp ở giai đoạn knock-out." },
+      { h: "Dự đoán phổ biến", t: "Pháp thắng cách biệt; chuyên gia dự đoán họ kiểm soát trận đấu từ sớm và không cho Thụy Điển nhiều cơ hội." },
+      { h: "Xác suất (theo mô phỏng)", t: "Thắng trong 90 phút: Pháp ~68-75%, Thụy Điển ~12-18%, Hòa ~15-20%. Xác suất đi tiếp: Pháp >80%. Dự đoán bàn thắng: trung bình 2.7-3.0 bàn/trận (Pháp thường thắng cách biệt). Siêu máy tính: Pháp vượt trội rõ rệt về chất lượng và kinh nghiệm — một trong những trận được dự đoán 'một chiều' nhất ngày." },
+      { h: "Nhận định tóm tắt", t: "Trận đấu Pháp được kỳ vọng thể hiện đẳng cấp, trong khi Thụy Điển chủ yếu chơi phòng ngự phản công." },
+      { h: "Dự đoán chi tiết", t: "Pháp chiếm ưu thế kiểm soát bóng, tận dụng tốc độ ở hai cánh và khả năng dứt điểm đa dạng. Thụy Điển có thể gây khó khăn trong 20-30 phút đầu nhưng sẽ mệt mỏi ở hiệp 2." },
+      { h: "Dự đoán kết quả", t: "Pháp thắng 2-0 hoặc 2-1, đi tiếp với tỷ lệ rất cao (>75%)." },
+    ],
+  },
+  "mexico|ecuador": {
+    title: "Nhận định chuyên sâu",
+    blocks: [
+      { h: "Phân tích cụ thể", t: "Mexico tận dụng lợi thế sân nhà (độ cao gây khó chịu cho đối thủ, khán giả cuồng nhiệt) cùng lối chơi pressing mạnh, tốc độ cao. Ecuador chơi chắc chắn, phòng ngự tốt nhưng thường thiếu sáng tạo và khả năng chịu áp lực lâu dài." },
+      { h: "Đánh giá chung từ thế giới & chuyên gia", t: "Chuyên gia Mỹ Latinh (ESPN, Telemundo) đánh giá Mexico nhỉnh hơn rõ rệt nhờ yếu tố sân bãi và phong độ gần đây. Ecuador được coi là đội khó chịu nhưng khó lật ngược thế trận trước chủ nhà." },
+      { h: "Dự đoán phổ biến", t: "Mexico thắng sát nút; chuyên gia nhấn mạnh yếu tố sân nhà là chìa khóa." },
+      { h: "Xác suất (theo mô phỏng)", t: "Thắng trong 90 phút: Mexico ~58-65%, Ecuador ~20-25%, Hòa ~18-22%. Xác suất đi tiếp: Mexico ~68-72%. Dự đoán bàn thắng: trung bình 2.5-2.8 bàn/trận. Siêu máy tính: yếu tố sân nhà (độ cao + khán giả) được tính toán mạnh, giúp Mexico có lợi thế rõ rệt trong các mô phỏng." },
+      { h: "Nhận định tóm tắt", t: "Mexico kiểm soát nhịp độ, Ecuador cố gắng phản công nhưng dễ bị áp đảo ở hiệp 2." },
+      { h: "Dự đoán chi tiết", t: "Mexico đẩy cao đội hình từ sớm, tận dụng khán giả để tạo sức ép. Ecuador có thể trụ vững hiệp 1 nhưng thể lực giảm sút ở hiệp 2, dẫn đến sai lầm." },
+      { h: "Dự đoán kết quả", t: "Mexico thắng 2-1 hoặc 1-0, đi tiếp với tỷ lệ ~65-70%." },
+    ],
+  },
 };
 
 // Tìm nhận định chuyên sâu cho một trận theo tên 2 đội (không phân biệt thứ tự)
 function getDeepNote(homeName, awayName) {
-  const norm = (s) => (s || "").trim().toLowerCase();
+  const norm = (s) => (s || "").trim().toLowerCase()
+    .replace("côte d'ivoire", "ivory coast")
+    .replace("cote d'ivoire", "ivory coast");
   const a = norm(homeName), b = norm(awayName);
   return DEEP_NOTES[`${a}|${b}`] || DEEP_NOTES[`${b}|${a}`] || null;
 }
