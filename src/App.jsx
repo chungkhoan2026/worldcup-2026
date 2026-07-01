@@ -57,13 +57,51 @@ const DEEP_NOTES = {
       { h: "Dự đoán kết quả", t: "Mexico thắng 2-1 hoặc 1-0, đi tiếp với tỷ lệ ~65-70%." },
     ],
   },
+  "england|congo dr": {
+    title: "Nhận định chuyên sâu",
+    blocks: [
+      { h: "Phân tích cụ thể", t: "Anh sở hữu đội hình giàu tài năng, pressing hiện đại, chuyển đổi nhanh và chiều sâu lực lượng. CHDC Congo mạnh về thể lực, tinh thần chiến đấu cao và khả năng phản công sắc bén từ các tình huống cố định, nhưng tổ chức chiến thuật và chất lượng cá nhân chưa bằng Anh." },
+      { h: "Đánh giá chung từ thế giới & chuyên gia", t: "Gary Neville, Rio Ferdinand và các chuyên gia Sky Sports, Opta đánh giá Anh vượt trội rõ rệt về đẳng cấp, kinh nghiệm knock-out và chất lượng tổng thể. CHDC Congo được tôn trọng nhờ tinh thần châu Phi nhưng khó cạnh tranh với Tam Sư ở giai đoạn này." },
+      { h: "Dự đoán phổ biến", t: "Anh thắng cách biệt, được xem là trận 'dễ thở' cho Anh theo hầu hết chuyên gia châu Âu." },
+      { h: "Nhận định tóm tắt", t: "Anh là cửa trên tuyệt đối, CHDC Congo có thể gây khó khăn ban đầu bằng tinh thần nhưng khó duy trì trước sức mạnh Anh." },
+      { h: "Dự đoán chi tiết", t: "Anh kiểm soát trận đấu từ sớm, tận dụng tốc độ cánh và khả năng dứt điểm đa dạng. CHDC Congo pressing cao ở hiệp 1 nhưng mệt mỏi hiệp 2, dẫn đến sai lầm phòng ngự. Siêu máy tính dự đoán Anh kiểm soát >60% thời gian bóng." },
+      { h: "Dự đoán kết quả", t: "Anh thắng 2-0 hoặc 3-1." },
+    ],
+  },
+  "belgium|senegal": {
+    title: "Nhận định chuyên sâu",
+    blocks: [
+      { h: "Phân tích cụ thể", t: "Bỉ có lối chơi tấn công đa dạng, sở hữu nhiều ngôi sao sáng tạo và kinh nghiệm. Senegal mạnh về thể lực, pressing cao, tinh thần và khả năng không chiến, nhưng có thể thiếu chiều sâu so với Bỉ." },
+      { h: "Đánh giá chung từ thế giới & chuyên gia", t: "Chuyên gia châu Âu đánh giá Bỉ nhỉnh hơn nhờ chất lượng cá nhân và tổ chức. Senegal được tôn trọng như 'đội mạnh châu Phi' nhưng Bỉ vẫn là cửa trên theo Opta và các nhà phân tích." },
+      { h: "Dự đoán phổ biến", t: "Bỉ thắng sát nút hoặc cách biệt nhẹ, nhiều chuyên gia dự đoán trận đấu hấp dẫn nhưng nghiêng về Bỉ." },
+      { h: "Nhận định tóm tắt", t: "Bỉ kiểm soát nhịp độ, Senegal nguy hiểm ở phản công và tình huống cố định." },
+      { h: "Dự đoán chi tiết", t: "Bỉ chiếm ưu thế kiểm soát, tận dụng sáng tạo từ các tiền vệ. Senegal gây áp lực thể lực ở hiệp 1, nhưng Bỉ thường bùng nổ ở hiệp 2 nhờ chiều sâu đội hình." },
+      { h: "Dự đoán kết quả", t: "Bỉ thắng 2-1 hoặc 2-0." },
+    ],
+  },
+  "usa|bosnia and herzegovina": {
+    title: "Nhận định chuyên sâu",
+    blocks: [
+      { h: "Phân tích cụ thể", t: "Mỹ (chủ nhà) chơi pressing cao, tốc độ và tận dụng sân nhà. Bosnia chơi chắc chắn, kỷ luật nhưng thường thiếu hiệu quả tấn công trước đội mạnh." },
+      { h: "Đánh giá chung từ thế giới & chuyên gia", t: "Chuyên gia Mỹ và quốc tế đánh giá Mỹ nhỉnh hơn rõ nhờ lợi thế sân nhà, khán giả và phong độ gần đây. Bosnia khó gây bất ngờ lớn." },
+      { h: "Dự đoán phổ biến", t: "Mỹ thắng sát nút hoặc cách biệt nhẹ nhờ yếu tố sân bãi." },
+      { h: "Nhận định tóm tắt", t: "Mỹ kiểm soát trận đấu, Bosnia cố gắng phòng ngự phản công nhưng khó lật ngược." },
+      { h: "Dự đoán chi tiết", t: "Mỹ đẩy cao đội hình từ sớm, tận dụng khán giả tạo sức ép. Bosnia trụ vững hiệp 1 nhưng thể lực giảm sút hiệp 2, dẫn đến bàn thua." },
+      { h: "Dự đoán kết quả", t: "Mỹ thắng 2-1 hoặc 1-0." },
+    ],
+  },
 };
 
 // Tìm nhận định chuyên sâu cho một trận theo tên 2 đội (không phân biệt thứ tự)
 function getDeepNote(homeName, awayName) {
   const norm = (s) => (s || "").trim().toLowerCase()
     .replace("côte d'ivoire", "ivory coast")
-    .replace("cote d'ivoire", "ivory coast");
+    .replace("cote d'ivoire", "ivory coast")
+    .replace("dr congo", "congo dr")
+    .replace("democratic republic of congo", "congo dr")
+    .replace("united states", "usa")
+    .replace("bosnia & herzegovina", "bosnia and herzegovina")
+    .replace(/^bosnia$/, "bosnia and herzegovina");
   const a = norm(homeName), b = norm(awayName);
   return DEEP_NOTES[`${a}|${b}`] || DEEP_NOTES[`${b}|${a}`] || null;
 }
